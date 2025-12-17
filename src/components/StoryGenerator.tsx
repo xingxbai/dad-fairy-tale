@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, RefreshCw, Book } from 'lucide-react';
+import { RefreshCw, Book } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Story } from '../types';
 
