@@ -72,3 +72,33 @@ export default defineConfig([
 ])
 ```
 # baby-tools
+
+## CI/CD: Build and Upload dist.zip
+
+This repo includes a GitHub Actions workflow that on every push will:
+
+- Install dependencies and run `npm run build`
+- Zip the `dist` directory into `dist.zip`
+- Upload `dist.zip` to your server via SCP
+
+Workflow file: `.github/workflows/build-and-upload.yml`
+
+### One-time setup
+
+1. Add the server password as a GitHub Secret:
+  - GitHub → Repository → Settings → Secrets and variables → Actions → New repository secret
+  - Name: `SERVER_PASSWORD`
+  - Value: your SSH password
+
+2. (Optional) If your SSH user is not `root`, change `SERVER_USER` in the workflow env.
+
+3. The workflow uploads to `~/apps/dad-fairy-tale/dist.zip` on host `123.57.133.106` by default. Adjust `APP_DIR` if needed.
+
+### Trigger
+
+Push to any branch will trigger the workflow automatically.
+
+### Notes
+
+- Uses `appleboy/ssh-action` and `appleboy/scp-action` with password auth. Consider SSH keys for better security.
+- It only uploads the artifact; it does not unpack/deploy on the server. Add extra SSH steps if you want to unzip and move files into your webroot.
