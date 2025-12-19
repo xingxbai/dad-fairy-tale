@@ -15,15 +15,40 @@ const ANDERSEN_TALES = [
 interface StoryGeneratorProps {
   onStoryGenerated: (story: Story) => void;
   voiceId?: string;
+  topics?: string[];
+  promptTemplate?: (title: string) => string;
+  buttonText?: string;
+  mockContent?: (title: string) => string;
 }
 
-export const StoryGenerator: React.FC<StoryGeneratorProps> = ({ onStoryGenerated }) => {
+export const StoryGenerator: React.FC<StoryGeneratorProps> = ({ 
+  onStoryGenerated, 
+  topics = ANDERSEN_TALES,
+  promptTemplate = (title) => `请给我讲一个关于《${title}》的故事，保留原著所有的故事情节，但适合胎教。`,
+  buttonText = "换一批故事",
+  mockContent
+}) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
 
   const generateStory = async (title: string) => {
     setIsGenerating(true);
     setSelectedTitle(title);
+
+    if (mockContent) {
+      setTimeout(() => {
+        const newStory: Story = {
+          id: Date.now().toString(),
+          title: title,
+          content: mockContent(title),
+          coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80'
+        };
+        onStoryGenerated(newStory);
+        setIsGenerating(false);
+        setSelectedTitle(null);
+      }, 500);
+      return;
+    }
 
     try {
       const API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
@@ -63,7 +88,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({ onStoryGenerated
             },
             {
               role: 'user',
-              content: `请给我讲一个关于《${title}》的故事，保留原著所有的故事情节，但适合胎教。`,
+              content: promptTemplate(title),
             },
           ],
           temperature: 0.7,
@@ -113,9 +138,9 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({ onStoryGenerated
       <div className="text-center mb-8">
         <h3 className="text-xl font-bold text-primary-900 mb-2 flex items-center justify-center gap-2">
           <Book className="w-6 h-6" />
-          安徒生童话精选 TOP 50
+          精选内容
         </h3>
-        <p className="text-sm text-gray-500">点击标签生成故事，播放时自动合成语音</p>
+        <p className="text-sm text-gray-500">点击标签生成内容，播放时自动合成语音</p>
       </div>
 
       {isGenerating ? (
@@ -124,16 +149,15 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({ onStoryGenerated
           <p className="text-lg text-primary-700">正在为您创作《{selectedTitle}》...</p>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-3 justify-center">
-          {ANDERSEN_TALES.map((title, index) => (
+        <div className="flex flex-wrap gap-3 justify-center mb-6">
+          {topics.map((title) => (
             <motion.button
               key={title}
               whileHover={{ scale: 1.05, backgroundColor: '#e0f2fe' }}
               whileTap={{ scale: 0.95 }}
               onClick={() => generateStory(title)}
-              className="px-4 py-2 bg-white border border-primary-100 rounded-full text-primary-700 text-sm shadow-sm hover:shadow-md transition-all"
+              className="px-4 py-2 bg-white border border-primary-100 rounded-full text-primary-700 shadow-sm hover:shadow-md transition-all text-sm font-medium"
             >
-              <span className="mr-1 text-primary-300 font-mono text-xs">{index + 1}.</span>
               {title}
             </motion.button>
           ))}

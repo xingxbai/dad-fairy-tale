@@ -1,15 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { Loader2, Wand2, Upload } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useVoice } from '../contexts/VoiceContext';
 
-interface VoiceRecorderProps {
-  onVoiceRecorded: (voiceId: string) => void;
-}
-
-export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onVoiceRecorded }) => {
+export const VoiceRecorder: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { setDadVoiceId } = useVoice();
 
   const handleFileClick = () => {
     fileInputRef.current?.click();
@@ -129,11 +127,16 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onVoiceRecorded })
         // status: 0=NotFound, 1=Training, 2=Success, 3=Failed, 4=Active
         const status = data.status;
 
-        if (status === 2 || status === 4) {
-          setStatusMessage('音色复刻成功！');
-          setIsProcessing(false);
-          onVoiceRecorded(speakerId);
-        } else if (status === 3) {
+            if (status === 2 || status === 4) {
+              setStatusMessage('音色复刻成功！');
+              setIsProcessing(false);
+              try {
+                setDadVoiceId(speakerId);
+              } catch (e) {
+                // fallback: keep localStorage
+                localStorage.setItem('dad_voice_id', speakerId);
+              }
+            } else if (status === 3) {
           setStatusMessage('音色复刻失败');
           setIsProcessing(false);
         } else {
