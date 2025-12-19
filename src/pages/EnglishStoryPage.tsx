@@ -1,17 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { VoiceRecorder } from '../components/VoiceRecorder';
 import { StoryGenerator } from '../components/StoryGenerator';
 import { AudioPlayer } from '../components/AudioPlayer';
 import { StoryDisplay } from '../components/StoryDisplay';
 import { generateTTS } from '../services/ttsService';
 import type { Story, UserState } from '../types';
-import { BookOpen, ArrowLeft, Settings } from 'lucide-react';
+import { BookOpen, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ENGLISH_STORIES } from '../data/topics';
 import { useVoice } from '../contexts/VoiceContext';
 import { VoiceSelector } from '../components/VoiceSelector';
-
-const STANDARD_ENGLISH_VOICE = 'S_pkpEVvSN1'; // 暂时使用克隆音色，因为标准音色 BV407_streaming 报 3001 错误
 
 export function EnglishStoryPage() {
   const [userState, setUserState] = useState<UserState>({
@@ -20,7 +18,7 @@ export function EnglishStoryPage() {
   });
   const [isPlaying, setIsPlaying] = useState(false);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
-  const { voiceType, setVoiceType, dadVoiceId, voiceId } = useVoice();
+  const { voiceId } = useVoice();
 
   const handleStoryGenerated = (story: Story) => {
     setUserState(prev => ({ ...prev, currentStory: story }));
@@ -71,7 +69,7 @@ export function EnglishStoryPage() {
       </header>
 
       <main className="container mx-auto px-4 pt-8 max-w-md">
-        { false && (!dadVoiceId && voiceType === 'dad') ? (
+        { false ? (
           <VoiceRecorder />
         ) : (
           <div className="space-y-8">
@@ -82,7 +80,6 @@ export function EnglishStoryPage() {
                   voiceId={voiceId || undefined}
                   topics={ENGLISH_STORIES}
                   promptTemplate={(title) => `Please tell me a simple story about "${title}" in English, suitable for prenatal education. Keep it short and sweet.`}
-                  buttonText="More English Stories"
                 />
               </div>
             ) : (
@@ -106,7 +103,6 @@ export function EnglishStoryPage() {
                     voiceId={userState.voiceId || undefined}
                     topics={ENGLISH_STORIES}
                     promptTemplate={(title) => `Please tell me a simple story about "${title}" in English, suitable for prenatal education. Keep it short and sweet.`}
-                    buttonText="More English Stories"
                   />
                 </div>
               </>

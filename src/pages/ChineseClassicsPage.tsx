@@ -77,7 +77,6 @@ export function ChineseClassicsPage() {
                   voiceId={voiceId || undefined}
                   topics={CHINESE_CLASSICS}
                   promptTemplate={(title) => `请为我生成关于《${title}》的内容。如果是诗词，请先列出原文，然后用温柔的语气进行简单的赏析和讲解，适合胎教。`}
-                  buttonText="换一批经典"
                 />
               </div>
             ) : (
@@ -101,7 +100,6 @@ export function ChineseClassicsPage() {
                     voiceId={voiceId || undefined}
                     topics={CHINESE_CLASSICS}
                     promptTemplate={(title) => `请为我生成关于《${title}》的内容。如果是诗词，请先列出原文，然后用温柔的语气进行简单的赏析和讲解，适合胎教。`}
-                    buttonText="换一批经典"
                   />
                 </div>
               </>

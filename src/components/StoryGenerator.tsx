@@ -17,7 +17,6 @@ interface StoryGeneratorProps {
   voiceId?: string;
   topics?: string[];
   promptTemplate?: (title: string) => string;
-  buttonText?: string;
   mockContent?: (title: string) => string;
 }
 
@@ -25,7 +24,6 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
   onStoryGenerated, 
   topics = ANDERSEN_TALES,
   promptTemplate = (title) => `请给我讲一个关于《${title}》的故事，保留原著所有的故事情节，但适合胎教。`,
-  buttonText = "换一批故事",
   mockContent
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);

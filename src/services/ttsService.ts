@@ -31,7 +31,7 @@ export const generateTTS = async (text: string, voiceId: string): Promise<string
 
 
     // 只有当 voiceId 是 S_ 开头，且不是默认的标准音色 ID (S_pkpEVvSN1) 时，才认为是克隆音色（爸爸音色）
-    const isClonedVoice = localStorage.english_voice_type === 'dad' ? true : false;
+    const isClonedVoice = voiceId?.startsWith('S_') && voiceId !== 'S_pkpEVvSN1';
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

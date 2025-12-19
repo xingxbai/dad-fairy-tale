@@ -77,7 +77,6 @@ export function BedtimeStoryPage() {
                   voiceId={voiceId || undefined}
                   topics={BEDTIME_STORIES}
                   promptTemplate={(title) => `请给我讲一个关于《${title}》的睡前故事，语气要非常温柔、舒缓，适合哄睡。`}
-                  buttonText="换一批故事"
                 />
               </div>
             ) : (
@@ -101,7 +100,6 @@ export function BedtimeStoryPage() {
                     voiceId={voiceId || undefined}
                     topics={BEDTIME_STORIES}
                     promptTemplate={(title) => `请给我讲一个关于《${title}》的睡前故事，语气要非常温柔、舒缓，适合哄睡。`}
-                    buttonText="换一批故事"
                   />
                 </div>
               </>
