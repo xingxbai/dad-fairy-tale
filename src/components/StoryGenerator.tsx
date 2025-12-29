@@ -50,7 +50,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       let wsUrl = `${wsProtocol}//${window.location.host}`;
       if (import.meta.env.DEV) {
-          wsUrl = 'ws://localhost:3000';
+          wsUrl = `ws://${window.location.hostname}:3000`;
       }
 
       const ws = new WebSocket(wsUrl);

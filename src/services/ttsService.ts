@@ -18,7 +18,7 @@ export const generateTTS = async (text: string, voiceId: string): Promise<string
     let wsUrl = `${wsProtocol}//${window.location.host}`;
     
     if (import.meta.env.DEV) {
-        wsUrl = 'ws://localhost:3000';
+        wsUrl = `ws://${window.location.hostname}:3000`;
     }
 
     const ws = new WebSocket(wsUrl);

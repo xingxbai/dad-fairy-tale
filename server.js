@@ -32,7 +32,7 @@ app.use('/api/v1/tts', createProxyMiddleware(proxyOptions));
 app.use('/api/v1/mega_tts', createProxyMiddleware(proxyOptions));
 
 // Handle SPA routing: return index.html for all non-API requests
-app.get(/.*/, (req, res) => {
+app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
@@ -43,8 +43,9 @@ const server = app.listen(PORT, () => {
 // WebSocket Server
 const wss = new WebSocketServer({ server });
 
-wss.on('connection', (ws) => {
-  console.log('Client connected');
+wss.on('connection', (ws, req) => {
+  const clientIp = req.socket.remoteAddress;
+  console.log(`Client connected from ${clientIp}`);
 
   ws.on('message', async (message) => {
     try {
