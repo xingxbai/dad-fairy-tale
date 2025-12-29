@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 
 type VoiceType = 'dad' | 'standard';
 
-const STANDARD_VOICE = 'S_pkpEVvSN1';
+const STANDARD_VOICE = 'zh_female_xueayi_saturn_bigtts';
 
 interface VoiceContextValue {
   dadVoiceId: string | null;

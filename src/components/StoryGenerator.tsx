@@ -28,106 +28,91 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
+  const [generatedContent, setGeneratedContent] = useState<string>('');
+  const [reasoningContent, setReasoningContent] = useState<string>('');
 
   const generateStory = async (title: string) => {
     setIsGenerating(true);
     setSelectedTitle(title);
+    setGeneratedContent('');
+    setReasoningContent('');
 
     if (mockContent) {
-      setTimeout(() => {
-        const newStory: Story = {
-          id: Date.now().toString(),
-          title: title,
-          content: mockContent(title),
-          coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80'
-        };
-        onStoryGenerated(newStory);
-        setIsGenerating(false);
-        setSelectedTitle(null);
-      }, 500);
+      // ... mock logic ...
       return;
     }
 
     try {
-      const API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-      // 默认使用火山引擎豆包接口 (兼容 OpenAI 格式)
-      const BASE_URL = (import.meta.env.VITE_OPENAI_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3').replace(/\/$/, '');
-      const MODEL = import.meta.env.VITE_OPENAI_MODEL || 'ep-20240604-xxxxx'; 
-      
-      if (!API_KEY) {
-        console.warn('未检测到 VITE_OPENAI_API_KEY，使用模拟数据生成');
-        setTimeout(() => {
-          const mockStory: Story = {
-            id: Date.now().toString(),
-            title: title,
-            content: `（提示：请配置 OpenAI API Key 以使用真实 AI 生成功能）\n\n这是关于《${title}》的模拟故事内容。很久很久以前...`,
-            coverImage: 'https://images.unsplash.com/photo-1550686041-366ad85a1355?w=800&q=80'
-          };
-          onStoryGenerated(mockStory);
-          setIsGenerating(false);
-          setSelectedTitle(null);
-        }, 1500);
-        return;
+      // WebSocket implementation
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      let wsUrl = `${wsProtocol}//${window.location.host}`;
+      if (import.meta.env.DEV) {
+          wsUrl = 'ws://localhost:3000';
       }
 
-      const response = await fetch(`${BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            {
-              role: 'system',
-              content:
-                '请直接返回JSON格式，包含 title (标题) 和 content (正文) 两个字段，不要包含其他Markdown标记。',
-            },
-            {
-              role: 'user',
-              content: promptTemplate(title),
-            },
-          ],
-          temperature: 0.7,
-        }),
-      });
+      const ws = new WebSocket(wsUrl);
+      let currentContent = '';
 
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error.message);
-      }
-
-      const contentStr = data.choices[0].message.content;
-      let storyData;
-      try {
-        // 尝试解析 JSON，如果返回的不是纯 JSON，可能需要做一些清理
-        const jsonStr = contentStr.replace(/```json\n?|\n?```/g, '').trim();
-        storyData = JSON.parse(jsonStr);
-      } catch (e) {
-        console.warn("Failed to parse JSON from LLM, using raw content", e);
-        storyData = {
-          title: title,
-          content: contentStr
-        };
-      }
-
-      const newStory: Story = {
-        id: Date.now().toString(),
-        title: storyData.title || title,
-        content: storyData.content,
-        coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80'
+      ws.onopen = () => {
+          ws.send(JSON.stringify({
+              type: 'generate_story',
+              title: title,
+              prompt: promptTemplate(title)
+          }));
       };
 
-      onStoryGenerated(newStory);
+      ws.onmessage = (event) => {
+          try {
+              const message = JSON.parse(event.data);
+              if (message.type === 'story_chunk') {
+                  currentContent += message.chunk;
+                  setGeneratedContent(currentContent);
+              } else if (message.type === 'story_reasoning') {
+                  setReasoningContent(prev => prev + message.chunk);
+              } else if (message.type === 'story_complete') {
+                  const newStory: Story = {
+                      id: Date.now().toString(),
+                      title: title,
+                      content: currentContent,
+                      coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80'
+                  };
+                  // Give user a moment to read the end before switching? 
+                  // Or maybe just switch immediately. 
+                  // Let's wait 1s for effect.
+                  setTimeout(() => {
+                      onStoryGenerated(newStory);
+                      setIsGenerating(false);
+                      setSelectedTitle(null);
+                      // setGeneratedContent('');
+                  }, 1000);
+                  ws.close();
+              } else if (message.type === 'error') {
+                  console.error('Story generation error:', message.message);
+                  alert(`生成故事失败: ${message.message}`);
+                  setIsGenerating(false);
+                  setSelectedTitle(null);
+                  setGeneratedContent('');
+                  ws.close();
+              }
+          } catch (e) {
+              console.error('Error parsing WebSocket message:', e);
+          }
+      };
+
+      ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          alert('连接服务器失败，请检查网络或服务器状态');
+          setIsGenerating(false);
+          setSelectedTitle(null);
+          setGeneratedContent('');
+      };
 
     } catch (error) {
-      console.error('Failed to generate story:', error);
-      alert('生成故事失败，请检查 API Key 或网络连接');
-    } finally {
+      console.error('Failed to initiate story generation:', error);
+      alert('生成故事失败，请检查网络连接');
       setIsGenerating(false);
       setSelectedTitle(null);
+      setGeneratedContent('');
     }
   };
 
@@ -142,9 +127,26 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
       </div>
 
       {isGenerating ? (
-        <div className="flex flex-col items-center justify-center py-12">
-          <RefreshCw className="w-12 h-12 text-primary-500 animate-spin mb-4" />
-          <p className="text-lg text-primary-700">正在为您创作《{selectedTitle}》...</p>
+        <div className="flex flex-col items-center justify-center py-12 w-full">
+           {reasoningContent && (
+              <div className="w-full mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-500 font-mono max-h-40 overflow-y-auto">
+                <div className="font-bold mb-1 text-gray-400 uppercase text-xs">Thinking Process</div>
+                <div className="whitespace-pre-wrap">{reasoningContent}</div>
+              </div>
+           )}
+
+           {generatedContent ? (
+              <div className="text-left w-full bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[200px] whitespace-pre-wrap font-serif leading-relaxed text-gray-800">
+                 <h3 className="text-xl font-bold mb-4 text-center text-primary-800">{selectedTitle}</h3>
+                 {generatedContent}
+                 <span className="inline-block w-2 h-4 ml-1 bg-primary-500 animate-pulse align-middle"/>
+              </div>
+           ) : (
+              <>
+                <RefreshCw className="w-12 h-12 text-primary-500 animate-spin mb-4" />
+                <p className="text-lg text-primary-700">正在为您创作《{selectedTitle}》...</p>
+              </>
+           )}
         </div>
       ) : (
         <div className="flex flex-wrap gap-3 justify-center mb-6">
