@@ -17,7 +17,7 @@ const VoiceContext = createContext<VoiceContextValue | undefined>(undefined);
 
 export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [dadVoiceId, setDadVoiceIdState] = useState<string | null>(() => {
-    return localStorage.getItem('dad_voice_id') || null;
+    return 'S_pkpEVvSN1';
   });
   const [voiceType, setVoiceTypeState] = useState<VoiceType>(() => {
     return (localStorage.getItem('english_voice_type') as VoiceType) || 'dad';
