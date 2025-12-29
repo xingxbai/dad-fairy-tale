@@ -2,10 +2,11 @@
 # 或者将内容添加到 /opt/homebrew/etc/nginx/nginx.conf 的 http 块中
 
 server {
-    listen 8081; # 使用 8081 避免与默认 8080 冲突，如果需要 80 端口请修改（可能需要 sudo）
-    server_name localhost;
+    listen 80; # 远端服务器通常使用 80 端口
+    server_name 123.57.133.10;
 
     # 项目根目录 (用于静态资源)
+    # [注意] 请务必将下面的路径修改为你远端服务器上实际的 dist 目录路径
     root /Users/baixingxing/xingxbai/frontend/2025AI/讲故事/dad-fairy-tale/dist;
     index index.html;
 
