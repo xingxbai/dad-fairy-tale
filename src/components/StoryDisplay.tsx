@@ -9,8 +9,7 @@ interface StoryDisplayProps {
 
 export const StoryDisplay: React.FC<StoryDisplayProps> = ({ 
   title, 
-  content, 
-  reasoning, 
+  content,
   isStreaming = false 
 }) => {
   return (
