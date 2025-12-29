@@ -1,38 +1,30 @@
-import React, { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
 
 interface StoryDisplayProps {
+  title?: string;
   content: string;
+  reasoning?: string;
+  isStreaming?: boolean;
 }
 
-export const StoryDisplay: React.FC<StoryDisplayProps> = ({ content }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
+export const StoryDisplay: React.FC<StoryDisplayProps> = ({ 
+  title, 
+  content, 
+  reasoning, 
+  isStreaming = false 
+}) => {
   return (
-    <div className="w-full max-w-md mx-auto bg-white/50 backdrop-blur-sm rounded-2xl p-6 shadow-sm">
-      <button 
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center justify-between w-full text-primary-800 font-medium mb-2"
-      >
-        <span>童话原文</span>
-        {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-      </button>
-      
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <p className="text-gray-600 leading-relaxed text-sm whitespace-pre-line pt-2">
-              {content}
-            </p>
-          </motion.div>
+    <div className="w-full max-w-md mx-auto bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[200px] font-serif leading-relaxed text-gray-800">
+      {title && (
+        <h3 className="text-xl font-bold mb-4 text-center text-primary-800">{title}</h3>
+      )}
+
+      <div className="whitespace-pre-wrap">
+        {content}
+        {isStreaming && (
+          <span className="inline-block w-2 h-4 ml-1 bg-primary-500 animate-pulse align-middle"/>
         )}
-      </AnimatePresence>
+      </div>
     </div>
   );
 };

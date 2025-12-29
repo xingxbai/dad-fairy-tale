@@ -74,7 +74,7 @@ wss.on('connection', (ws) => {
             audio: {
                 voice_type: "zh_female_xueayi_saturn_bigtts",
                 encoding: "mp3",
-                speed_ratio: 0.8
+                speed_ratio: 0.9
             },
             request: {
                 reqid: reqId,
@@ -94,7 +94,7 @@ wss.on('connection', (ws) => {
                 audio: {
                     voice_type: voiceId,
                     encoding: "mp3",
-                    speed_ratio: 0.8,
+                    speed_ratio: 0.9,
                 },
                 request: {
                     reqid: reqId,
@@ -130,18 +130,45 @@ wss.on('connection', (ws) => {
 
         volcWs.on('message', (data) => {
             const msgType = (data[1] >> 4) & 0x0F;
+            const compression = data[2] & 0x0F;
             
             if (msgType === 0xB) { // Audio-only server response
                 const headerSize = (data[0] & 0x0F) * 4;
-                const audioData = data.slice(headerSize);
+                let offset = headerSize;
                 
-                ws.send(JSON.stringify({ 
-                    type: 'tts_audio', 
-                    data: audioData.toString('base64') 
-                }));
-
                 const flags = data[1] & 0x0F;
-                if (flags === 0x2 || flags === 0x3) { // Last message
+                // If bit 0 of flags is set, there is a 4-byte sequence number
+                if (flags & 0x01) { 
+                    offset += 4;
+                }
+                // There is always a 4-byte payload size
+                offset += 4; 
+
+                if (offset > data.length) {
+                    // Should not happen if protocol is correct, but safety check
+                    console.error('TTS Protocol Error: Offset exceeds data length');
+                    return;
+                }
+
+                let audioData = data.slice(offset);
+                
+                if (compression === 1) { // Gzip compressed
+                    try {
+                        audioData = zlib.gunzipSync(audioData);
+                    } catch (e) {
+                        console.error('TTS Audio Gunzip error:', e);
+                        return;
+                    }
+                }
+
+                if (audioData.length > 0) {
+                    ws.send(JSON.stringify({ 
+                        type: 'tts_audio', 
+                        data: audioData.toString('base64') 
+                    }));
+                }
+
+                if (flags & 0x02) { // Last message (bit 1)
                     ws.send(JSON.stringify({ type: 'tts_complete' }));
                     volcWs.close();
                 }
@@ -165,7 +192,7 @@ wss.on('connection', (ws) => {
 
       } else if (data.type === 'generate_story') {
         console.log(`[${new Date().toISOString()}] Received generate_story request for: ${data.title}`);
-        const { title, prompt } = data;
+        const { title, prompt, type, ...extraParams } = data;
         
         const API_KEY = process.env.VITE_OPENAI_API_KEY;
         const BASE_URL = (process.env.VITE_OPENAI_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3').replace(/\/$/, '');
@@ -196,8 +223,9 @@ wss.on('connection', (ws) => {
                       content: prompt,
                     },
                   ],
-                  temperature: 0.7,
+                  temperature: 0.8,
                   stream: true,
+                  ...extraParams
                 }),
             });
 
@@ -244,8 +272,8 @@ wss.on('connection', (ws) => {
                             console.log(`[${new Date().toISOString()}] Sending chunk to client: ${JSON.stringify(content).substring(0, 20)}...`);
                             ws.send(JSON.stringify({ type: 'story_chunk', chunk: content }));
                         } else if (reasoning) {
-                            console.log(`[${new Date().toISOString()}] Sending reasoning to client: ${JSON.stringify(reasoning).substring(0, 20)}...`);
-                            ws.send(JSON.stringify({ type: 'story_reasoning', chunk: reasoning }));
+                            // Skip sending reasoning to client as per user request
+                            // console.log(`[${new Date().toISOString()}] Skipping reasoning chunk...`);
                         } else {
                             // Log if we receive a packet but no content (e.g. reasoning or empty delta)
                             console.log(`[${new Date().toISOString()}] Received packet without content. Keys: ${Object.keys(delta || {})}`);

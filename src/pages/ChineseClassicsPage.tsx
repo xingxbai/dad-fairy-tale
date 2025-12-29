@@ -20,8 +20,27 @@ export function ChineseClassicsPage() {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const { dadVoiceId, voiceId } = useVoice();
 
+  // Streaming state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [streamingStory, setStreamingStory] = useState<{title: string, content: string, reasoning: string} | null>(null);
+
+  const handleGenerationStart = (title: string) => {
+      setIsGenerating(true);
+      setStreamingStory({ title, content: '', reasoning: '' });
+  };
+
+  const handleStreamUpdate = (content: string) => {
+      setStreamingStory(prev => prev ? { ...prev, content } : null);
+  };
+  
+  const handleReasoningUpdate = (reasoning: string) => {
+      setStreamingStory(prev => prev ? { ...prev, reasoning } : null);
+  };
+
   const handleStoryGenerated = (story: Story) => {
     setUserState(prev => ({ ...prev, currentStory: story }));
+    setIsGenerating(false);
+    setStreamingStory(null);
     setIsPlaying(false);
   };
 
@@ -70,10 +89,35 @@ export function ChineseClassicsPage() {
           <VoiceRecorder />
         ) : (
           <div className="space-y-8">
-            {!userState.currentStory ? (
+            {isGenerating ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                    {streamingStory && (
+                        <StoryDisplay 
+                            title={streamingStory.title}
+                            content={streamingStory.content}
+                            reasoning={streamingStory.reasoning}
+                            isStreaming={true}
+                        />
+                    )}
+                    <div className="hidden">
+                        <StoryGenerator 
+                            onStoryGenerated={handleStoryGenerated}
+                            onGenerationStart={handleGenerationStart}
+                            onStreamUpdate={handleStreamUpdate}
+                            onReasoningUpdate={handleReasoningUpdate}
+                            voiceId={voiceId || undefined}
+                            topics={CHINESE_CLASSICS}
+                            promptTemplate={(title) => `请为我生成关于《${title}》的内容。如果是诗词，请先列出原文，然后用温柔的语气进行简单的赏析和讲解，适合胎教。`}
+                        />
+                    </div>
+                </div>
+            ) : !userState.currentStory ? (
               <div className="flex flex-col items-center justify-center min-h-[60vh]">
                 <StoryGenerator 
-                  onStoryGenerated={handleStoryGenerated} 
+                  onStoryGenerated={handleStoryGenerated}
+                  onGenerationStart={handleGenerationStart}
+                  onStreamUpdate={handleStreamUpdate}
+                  onReasoningUpdate={handleReasoningUpdate}
                   voiceId={voiceId || undefined}
                   topics={CHINESE_CLASSICS}
                   promptTemplate={(title) => `请为我生成关于《${title}》的内容。如果是诗词，请先列出原文，然后用温柔的语气进行简单的赏析和讲解，适合胎教。`}
@@ -96,7 +140,10 @@ export function ChineseClassicsPage() {
                 
                 <div className="flex justify-center pt-4">
                   <StoryGenerator 
-                    onStoryGenerated={handleStoryGenerated} 
+                    onStoryGenerated={handleStoryGenerated}
+                    onGenerationStart={handleGenerationStart}
+                    onStreamUpdate={handleStreamUpdate}
+                    onReasoningUpdate={handleReasoningUpdate}
                     voiceId={voiceId || undefined}
                     topics={CHINESE_CLASSICS}
                     promptTemplate={(title) => `请为我生成关于《${title}》的内容。如果是诗词，请先列出原文，然后用温柔的语气进行简单的赏析和讲解，适合胎教。`}
