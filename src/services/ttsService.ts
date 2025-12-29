@@ -8,154 +8,99 @@ export const generateTTS = async (text: string, voiceId: string): Promise<string
     return null;
   }
 
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  let wsUrl = `${wsProtocol}//${window.location.host}`;
-  
-  if (import.meta.env.DEV) {
-      wsUrl = 'ws://localhost:3000';
-  }
+  const mediaSource = new MediaSource();
+  const audioUrl = URL.createObjectURL(mediaSource);
 
-  // Check for MediaSource support and audio/mpeg codec support
-  // iOS Safari supports MediaSource but NOT audio/mpeg in MSE
-  const isMSE_Supported = 'MediaSource' in window && MediaSource.isTypeSupported('audio/mpeg');
+  mediaSource.addEventListener('sourceopen', () => {
+    const sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
+    
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let wsUrl = `${wsProtocol}//${window.location.host}`;
+    
+    if (import.meta.env.DEV) {
+        wsUrl = 'ws://localhost:3000';
+    }
 
-  if (isMSE_Supported) {
-    const mediaSource = new MediaSource();
-    const audioUrl = URL.createObjectURL(mediaSource);
+    const ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+    
+    const queue: ArrayBuffer[] = [];
 
-    mediaSource.addEventListener('sourceopen', () => {
-      const sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
-      
-      const ws = new WebSocket(wsUrl);
-      ws.binaryType = 'arraybuffer';
-      
-      const queue: ArrayBuffer[] = [];
-
-      const processQueue = () => {
-        if (queue.length > 0 && !sourceBuffer.updating) {
-          try {
-            const chunk = queue.shift();
-            if (chunk) {
-              sourceBuffer.appendBuffer(chunk);
-            }
-          } catch (e) {
-            console.error('SourceBuffer append error', e);
-          }
-        }
-      };
-
-      sourceBuffer.addEventListener('updateend', () => {
-        processQueue();
-        if (queue.length === 0 && ws.readyState === WebSocket.CLOSED && mediaSource.readyState === 'open' && !sourceBuffer.updating) {
-          try {
-              mediaSource.endOfStream();
-          } catch (e) {
-              console.error('endOfStream error', e);
-          }
-        }
-      });
-
-      ws.onopen = () => {
-        ws.send(JSON.stringify({
-          type: 'tts',
-          text: text,
-          voiceId: voiceId
-        }));
-      };
-
-      ws.onmessage = (event) => {
+    const processQueue = () => {
+      if (queue.length > 0 && !sourceBuffer.updating) {
         try {
-          const message = JSON.parse(event.data);
-          
-          if (message.type === 'tts_audio') {
-              const binaryString = atob(message.data);
-              const len = binaryString.length;
-              const bytes = new Uint8Array(len);
-              for (let i = 0; i < len; i++) {
-                  bytes[i] = binaryString.charCodeAt(i);
-              }
-              queue.push(bytes.buffer);
-              processQueue();
-          } else if (message.type === 'tts_complete') {
-              ws.close();
-              if (queue.length === 0 && !sourceBuffer.updating && mediaSource.readyState === 'open') {
-                  mediaSource.endOfStream();
-              }
-          } else if (message.type === 'error') {
-              console.error('TTS Error:', message.message);
-              ws.close();
-              if (mediaSource.readyState === 'open') {
-                  mediaSource.endOfStream('network');
-              }
+          const chunk = queue.shift();
+          if (chunk) {
+            sourceBuffer.appendBuffer(chunk);
           }
         } catch (e) {
-          console.error('Error processing TTS message:', e);
+          console.error('SourceBuffer append error', e);
         }
-      };
+      }
+    };
 
-      ws.onerror = (e) => {
-        console.error('WebSocket error:', e);
-        if (mediaSource.readyState === 'open') {
-          mediaSource.endOfStream('network');
+    sourceBuffer.addEventListener('updateend', () => {
+      processQueue();
+      if (queue.length === 0 && ws.readyState === WebSocket.CLOSED && mediaSource.readyState === 'open' && !sourceBuffer.updating) {
+        try {
+            mediaSource.endOfStream();
+        } catch (e) {
+            console.error('endOfStream error', e);
         }
-      };
-
-      mediaSource.addEventListener('sourceclose', () => {
-          if (ws.readyState === WebSocket.OPEN) {
-              ws.close();
-          }
-      });
+      }
     });
 
-    return audioUrl;
-  } else {
-    // Fallback for iOS/Mobile where MSE for audio/mpeg is not supported
-    // Buffer all data and return Blob URL
-    return new Promise((resolve, reject) => {
-        const ws = new WebSocket(wsUrl);
-        ws.binaryType = 'arraybuffer';
-        const chunks: ArrayBuffer[] = [];
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: 'tts',
+        text: text,
+        voiceId: voiceId
+      }));
+    };
 
-        ws.onopen = () => {
-          ws.send(JSON.stringify({
-            type: 'tts',
-            text: text,
-            voiceId: voiceId
-          }));
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            
-            if (message.type === 'tts_audio') {
-                const binaryString = atob(message.data);
-                const len = binaryString.length;
-                const bytes = new Uint8Array(len);
-                for (let i = 0; i < len; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                chunks.push(bytes.buffer);
-            } else if (message.type === 'tts_complete') {
-                ws.close();
-                const blob = new Blob(chunks, { type: 'audio/mpeg' });
-                const url = URL.createObjectURL(blob);
-                resolve(url);
-            } else if (message.type === 'error') {
-                console.error('TTS Error:', message.message);
-                ws.close();
-                reject(new Error(message.message));
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === 'tts_audio') {
+            const binaryString = atob(message.data);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
             }
-          } catch (e) {
-            console.error('Error processing TTS message:', e);
-            reject(e);
-          }
-        };
+            queue.push(bytes.buffer);
+            processQueue();
+        } else if (message.type === 'tts_complete') {
+            ws.close();
+            if (queue.length === 0 && !sourceBuffer.updating && mediaSource.readyState === 'open') {
+                mediaSource.endOfStream();
+            }
+        } else if (message.type === 'error') {
+            console.error('TTS Error:', message.message);
+            ws.close();
+            if (mediaSource.readyState === 'open') {
+                mediaSource.endOfStream('network');
+            }
+        }
+      } catch (e) {
+        console.error('Error processing TTS message:', e);
+      }
+    };
 
-        ws.onerror = (e) => {
-          console.error('WebSocket error:', e);
-          reject(e);
-        };
+    ws.onerror = (e) => {
+      console.error('WebSocket error:', e);
+      if (mediaSource.readyState === 'open') {
+        mediaSource.endOfStream('network');
+      }
+    };
+
+    mediaSource.addEventListener('sourceclose', () => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.close();
+        }
     });
-  }
+  });
+
+  return audioUrl;
 };
