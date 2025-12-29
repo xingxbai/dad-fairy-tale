@@ -95,6 +95,7 @@ wss.on('connection', (ws) => {
                     voice_type: voiceId,
                     encoding: "mp3",
                     speed_ratio: 0.9,
+                    emotion: "neutral"
                 },
                 request: {
                     reqid: reqId,
