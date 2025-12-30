@@ -57,7 +57,7 @@ export const VoiceRecorder: React.FC = () => {
     const token = import.meta.env.VITE_VOLC_TTS_TOKEN;
     
     if (!appid || !token) {
-      throw new Error("请配置 VITE_VOLC_TTS_APPID 和 VITE_VOLC_TTS_TOKEN");
+      throw new Error("请配置  VITE_VOLC_TTS_APPID 和 VITE_VOLC_TTS_TOKEN");
     }
 
     // 使用指定的 speaker_id
