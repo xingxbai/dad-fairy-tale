@@ -31,7 +31,7 @@ export function CustomTextPage() {
         console.error('生成语音失败: URL is null');
       }
     } catch (error) {
-      console.error('生成语音出错:', error);
+      console.error('生成语音出错了:', error);
     } finally {
       setIsGenerating(false);
     }
