@@ -9,6 +9,14 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+    steps:
+      # 1. 调试步骤：检查 Secrets 是否存在
+      - name: Check Secrets
+        run: |
+          if [ -z "${{ secrets.HOST }}" ]; then echo "Error: HOST secret is missing"; else echo "HOST secret is set"; fi
+          if [ -z "${{ secrets.USERNAME }}" ]; then echo "Error: USERNAME secret is missing"; else echo "USERNAME secret is set"; fi
+          if [ -z "${{ secrets.PASSWORD }}" ]; then echo "Error: PASSWORD secret is missing"; else echo "PASSWORD secret is set"; fi
+
       - name: Deploy using SSH
         uses: appleboy/ssh-action@master
         with:
@@ -26,18 +34,17 @@ jobs:
             git fetch --all
             git reset --hard origin/main
             
-            # 3. 自动生成 .env 文件 (解决服务器缺少环境变量的问题)
+            # 3. 自动生成 .env 文件
             echo "VITE_VOLC_TTS_APPID=$VITE_VOLC_TTS_APPID" > .env
             echo "VITE_VOLC_TTS_TOKEN=$VITE_VOLC_TTS_TOKEN" >> .env
             echo "VITE_OPENAI_API_KEY=$VITE_OPENAI_API_KEY" >> .env
-            # 如果有配置这两个可选变量，也写入
             if [ ! -z "$VITE_OPENAI_BASE_URL" ]; then echo "VITE_OPENAI_BASE_URL=$VITE_OPENAI_BASE_URL" >> .env; fi
             if [ ! -z "$VITE_OPENAI_MODEL" ]; then echo "VITE_OPENAI_MODEL=$VITE_OPENAI_MODEL" >> .env; fi
             
-            # 4. 安装依赖 (包括构建工具)
+            # 4. 安装依赖
             npm install
             
-            # 5. 在服务器上构建
+            # 5. 构建
             npm run build
             
             # 6. 重启服务
