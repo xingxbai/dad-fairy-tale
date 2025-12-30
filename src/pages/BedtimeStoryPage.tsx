@@ -20,8 +20,27 @@ export function BedtimeStoryPage() {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const { dadVoiceId, voiceId } = useVoice();
 
+  // Streaming state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [streamingStory, setStreamingStory] = useState<{title: string, content: string, reasoning: string} | null>(null);
+
+  const handleGenerationStart = (title: string) => {
+      setIsGenerating(true);
+      setStreamingStory({ title, content: '', reasoning: '' });
+  };
+
+  const handleStreamUpdate = (content: string) => {
+      setStreamingStory(prev => prev ? { ...prev, content } : null);
+  };
+  
+  const handleReasoningUpdate = (reasoning: string) => {
+      setStreamingStory(prev => prev ? { ...prev, reasoning } : null);
+  };
+
   const handleStoryGenerated = (story: Story) => {
     setUserState(prev => ({ ...prev, currentStory: story }));
+    setIsGenerating(false);
+    setStreamingStory(null);
     setIsPlaying(false);
   };
 
@@ -70,10 +89,35 @@ export function BedtimeStoryPage() {
           <VoiceRecorder />
         ) : (
           <div className="space-y-8">
-            {!userState.currentStory ? (
+            {isGenerating ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                    {streamingStory && (
+                        <StoryDisplay 
+                            title={streamingStory.title}
+                            content={streamingStory.content}
+                            reasoning={streamingStory.reasoning}
+                            isStreaming={true}
+                        />
+                    )}
+                    <div className="hidden">
+                        <StoryGenerator 
+                            onStoryGenerated={handleStoryGenerated}
+                            onGenerationStart={handleGenerationStart}
+                            onStreamUpdate={handleStreamUpdate}
+                            onReasoningUpdate={handleReasoningUpdate}
+                            voiceId={voiceId || undefined}
+                            topics={BEDTIME_STORIES}
+                            promptTemplate={(title) => `请给我讲一个关于《${title}》的睡前故事，语气要非常温柔、舒缓，适合哄睡。`}
+                        />
+                    </div>
+                </div>
+            ) : !userState.currentStory ? (
               <div className="flex flex-col items-center justify-center min-h-[60vh]">
                 <StoryGenerator 
                   onStoryGenerated={handleStoryGenerated} 
+                  onGenerationStart={handleGenerationStart}
+                  onStreamUpdate={handleStreamUpdate}
+                  onReasoningUpdate={handleReasoningUpdate}
                   voiceId={voiceId || undefined}
                   topics={BEDTIME_STORIES}
                   promptTemplate={(title) => `请给我讲一个关于《${title}》的睡前故事，语气要非常温柔、舒缓，适合哄睡。`}
@@ -97,6 +141,9 @@ export function BedtimeStoryPage() {
                 <div className="flex justify-center pt-4">
                   <StoryGenerator 
                     onStoryGenerated={handleStoryGenerated} 
+                    onGenerationStart={handleGenerationStart}
+                    onStreamUpdate={handleStreamUpdate}
+                    onReasoningUpdate={handleReasoningUpdate}
                     voiceId={voiceId || undefined}
                     topics={BEDTIME_STORIES}
                     promptTemplate={(title) => `请给我讲一个关于《${title}》的睡前故事，语气要非常温柔、舒缓，适合哄睡。`}

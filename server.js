@@ -287,8 +287,9 @@ wss.on('connection', (ws, req) => {
                             console.log(`[${new Date().toISOString()}] Sending chunk to client: ${JSON.stringify(content).substring(0, 20)}...`);
                             ws.send(JSON.stringify({ type: 'story_chunk', chunk: content }));
                         } else if (reasoning) {
-                            // Skip sending reasoning to client as per user request
-                            // console.log(`[${new Date().toISOString()}] Skipping reasoning chunk...`);
+                            // Send reasoning to client
+                            // console.log(`[${new Date().toISOString()}] Sending reasoning chunk...`);
+                            ws.send(JSON.stringify({ type: 'story_reasoning', chunk: reasoning }));
                         } else {
                             // Log if we receive a packet but no content (e.g. reasoning or empty delta)
                             console.log(`[${new Date().toISOString()}] Received packet without content. Keys: ${Object.keys(delta || {})}`);

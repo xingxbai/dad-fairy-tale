@@ -20,8 +20,27 @@ export function EnglishStoryPage() {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const { voiceId } = useVoice();
 
+  // Streaming state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [streamingStory, setStreamingStory] = useState<{title: string, content: string, reasoning: string} | null>(null);
+
+  const handleGenerationStart = (title: string) => {
+      setIsGenerating(true);
+      setStreamingStory({ title, content: '', reasoning: '' });
+  };
+
+  const handleStreamUpdate = (content: string) => {
+      setStreamingStory(prev => prev ? { ...prev, content } : null);
+  };
+  
+  const handleReasoningUpdate = (reasoning: string) => {
+      setStreamingStory(prev => prev ? { ...prev, reasoning } : null);
+  };
+
   const handleStoryGenerated = (story: Story) => {
     setUserState(prev => ({ ...prev, currentStory: story }));
+    setIsGenerating(false);
+    setStreamingStory(null);
     setIsPlaying(false);
   };
 
@@ -73,10 +92,35 @@ export function EnglishStoryPage() {
           <VoiceRecorder />
         ) : (
           <div className="space-y-8">
-            {!userState.currentStory ? (
+            {isGenerating ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                    {streamingStory && (
+                        <StoryDisplay 
+                            title={streamingStory.title}
+                            content={streamingStory.content}
+                            reasoning={streamingStory.reasoning}
+                            isStreaming={true}
+                        />
+                    )}
+                    <div className="hidden">
+                        <StoryGenerator 
+                            onStoryGenerated={handleStoryGenerated}
+                            onGenerationStart={handleGenerationStart}
+                            onStreamUpdate={handleStreamUpdate}
+                            onReasoningUpdate={handleReasoningUpdate}
+                            voiceId={voiceId || undefined}
+                            topics={ENGLISH_STORIES}
+                            promptTemplate={(title) => `Please tell me a simple story about "${title}" in English, suitable for prenatal education. Keep it short and sweet.`}
+                        />
+                    </div>
+                </div>
+            ) : !userState.currentStory ? (
               <div className="flex flex-col items-center justify-center min-h-[60vh]">
                 <StoryGenerator 
                   onStoryGenerated={handleStoryGenerated} 
+                  onGenerationStart={handleGenerationStart}
+                  onStreamUpdate={handleStreamUpdate}
+                  onReasoningUpdate={handleReasoningUpdate}
                   voiceId={voiceId || undefined}
                   topics={ENGLISH_STORIES}
                   promptTemplate={(title) => `Please tell me a simple story about "${title}" in English, suitable for prenatal education. Keep it short and sweet.`}
@@ -100,6 +144,9 @@ export function EnglishStoryPage() {
                 <div className="flex justify-center pt-4">
                   <StoryGenerator 
                     onStoryGenerated={handleStoryGenerated} 
+                    onGenerationStart={handleGenerationStart}
+                    onStreamUpdate={handleStreamUpdate}
+                    onReasoningUpdate={handleReasoningUpdate}
                     voiceId={userState.voiceId || undefined}
                     topics={ENGLISH_STORIES}
                     promptTemplate={(title) => `Please tell me a simple story about "${title}" in English, suitable for prenatal education. Keep it short and sweet.`}
