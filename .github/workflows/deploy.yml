@@ -9,7 +9,41 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy using SSH
+      # 1. 拉取代码到 GitHub 的构建机器
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 设置 Node.js 环境
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. 在 GitHub 机器上安装依赖并构建 (服务器不消耗资源)
+      - name: Install and Build
+        run: |
+          npm install
+          npm run build
+          # 删除 node_modules，因为传输太慢，我们只传构建产物和必要文件
+          rm -rf node_modules
+
+      # 4. 将构建好的文件 (dist, server.js 等) 复制到服务器
+      - name: Copy files to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: 22
+          # 只需要传输这些运行时的必要文件
+          source: "dist/,server.js,package.json,package-lock.json"
+          target: ${{ secrets.PROJECT_PATH }}
+          # 覆盖前不删除目标目录，直接覆盖文件
+          strip_components: 0
+
+      # 5. SSH 登录服务器，安装生产依赖并重启
+      - name: Restart Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
@@ -17,18 +51,12 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: 22
           script: |
-            # 1. Go to project directory
             cd ${{ secrets.PROJECT_PATH }}
             
-            # 2. Pull latest code
-            git pull origin main
+            # 只安装生产环境依赖 (速度快，体积小)
+            npm install --production
             
-            # 3. Install dependencies (in case package.json changed)
-            npm install
+            # 重启服务
+            pm2 reload all || pm2 start server.js --name "dad-fairy-tale"
             
-            # 4. Build the project
-            npm run build
-            
-            # 5. Restart PM2 processes
-            pm2 stop all
-            pm2 start all
+            echo "Deployment successful!"
