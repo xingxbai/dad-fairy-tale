@@ -9,7 +9,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    steps:
       # 1. 调试步骤：检查 Secrets 是否存在
       - name: Check Secrets
         run: |
