@@ -32,7 +32,7 @@ app.use('/api/v1/tts', createProxyMiddleware(proxyOptions));
 app.use('/api/v1/mega_tts', createProxyMiddleware(proxyOptions));
 
 // Handle SPA routing: return index.html for all non-API requests
-app.get('*', (req, res) => {
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
@@ -46,8 +46,21 @@ const wss = new WebSocketServer({ server });
 wss.on('connection', (ws, req) => {
   const clientIp = req.socket.remoteAddress;
   console.log(`Client connected from ${clientIp}`);
+  console.log('Headers:', JSON.stringify(req.headers));
+
+  // Send a welcome message to verify downlink
+  try {
+    ws.send(JSON.stringify({ type: 'welcome', message: 'Connected to server' }));
+  } catch (e) {
+    console.error('Error sending welcome message:', e);
+  }
+
+  ws.on('error', (err) => {
+    console.error(`WebSocket error with ${clientIp}:`, err);
+  });
 
   ws.on('message', async (message) => {
+    console.log(`Received message from ${clientIp}: ${message.toString().slice(0, 100)}...`);
     try {
       const data = JSON.parse(message);
       
@@ -299,7 +312,15 @@ wss.on('connection', (ws, req) => {
     }
   });
 
+  // Keep-alive interval
+  const keepAliveInterval = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.ping();
+    }
+  }, 30000);
+
   ws.on('close', () => {
     console.log('Client disconnected');
+    clearInterval(keepAliveInterval);
   });
 });

@@ -28,11 +28,10 @@ export function CustomTextPage() {
         setAudioUrl(url);
         setIsPlaying(true);
       } else {
-        alert('生成语音失败');
+        console.error('生成语音失败: URL is null');
       }
     } catch (error) {
-      console.error(error);
-      alert('生成语音出错');
+      console.error('生成语音出错:', error);
     } finally {
       setIsGenerating(false);
     }

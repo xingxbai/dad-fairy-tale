@@ -39,6 +39,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
   const generateStory = async (title: string) => {
     setIsGenerating(true);
     onGenerationStart?.(title);
+    let isComplete = false;
 
     if (mockContent) {
       // ... mock logic ...
@@ -58,16 +59,23 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
       let currentReasoning = '';
 
       ws.onopen = () => {
-          ws.send(JSON.stringify({
-              type: 'generate_story',
-              title: title,
-              prompt: promptTemplate(title)
-          }));
+          try {
+            ws.send(JSON.stringify({
+                type: 'generate_story',
+                title: title,
+                prompt: promptTemplate(title)
+            }));
+          } catch (e) {
+            console.error('Send failed:', e);
+          }
       };
 
       ws.onmessage = (event) => {
           try {
               const message = JSON.parse(event.data);
+              if (message.type === 'welcome') {
+                  return;
+              }
               if (message.type === 'story_chunk') {
                   currentContent += message.chunk;
                   onStreamUpdate?.(currentContent);
@@ -75,6 +83,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
                   currentReasoning += message.chunk;
                   onReasoningUpdate?.(currentReasoning);
               } else if (message.type === 'story_complete') {
+                  isComplete = true;
                   const newStory: Story = {
                       id: Date.now().toString(),
                       title: title,
@@ -90,18 +99,29 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
               } else if (message.type === 'error') {
                   console.error('Story generation error:', message.message);
                   alert(`生成故事失败: ${message.message}`);
+                  isComplete = true;
                   setIsGenerating(false);
                   ws.close();
               }
           } catch (e) {
               console.error('Error parsing WebSocket message:', e);
+              setIsGenerating(false);
           }
       };
 
       ws.onerror = (error) => {
           console.error('WebSocket error:', error);
-          alert('连接服务器失败，请检查网络或服务器状态');
-          setIsGenerating(false);
+          if (!isComplete) {
+             alert('连接服务器失败，请重试');
+             setIsGenerating(false);
+          }
+      };
+
+      ws.onclose = (event) => {
+          if (!isComplete) {
+              console.log('WebSocket closed unexpectedly');
+              setIsGenerating(false);
+          }
       };
 
     } catch (error) {

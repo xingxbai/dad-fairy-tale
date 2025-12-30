@@ -1,4 +1,3 @@
-
 export const generateTTS = async (text: string, voiceId: string): Promise<string | null> => {
   const ttsAppId = import.meta.env.VITE_VOLC_TTS_APPID;
   const ttsToken = import.meta.env.VITE_VOLC_TTS_TOKEN;
@@ -6,6 +5,69 @@ export const generateTTS = async (text: string, voiceId: string): Promise<string
   if (!ttsAppId || !ttsToken) {
     console.error('TTS AppID or Token missing');
     return null;
+  }
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  // Fallback for iOS/Browsers without MediaSource support
+  if (!('MediaSource' in window) || isIOS) {
+    return new Promise((resolve) => {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let wsUrl = `${wsProtocol}//${window.location.host}`;
+        
+        if (import.meta.env.DEV) {
+            wsUrl = `ws://${window.location.hostname}:3000`;
+        }
+
+        const ws = new WebSocket(wsUrl);
+        ws.binaryType = 'arraybuffer';
+        const chunks: BlobPart[] = [];
+
+        ws.onopen = () => {
+            ws.send(JSON.stringify({
+                type: 'tts',
+                text: text,
+                voiceId: voiceId
+            }));
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'welcome') {
+                    // Ignore welcome message for TTS service if present, or handle it
+                    return;
+                }
+                if (message.type === 'tts_audio') {
+                    const binaryString = atob(message.data);
+                    const len = binaryString.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    chunks.push(bytes.buffer);
+                } else if (message.type === 'tts_complete') {
+                    ws.close();
+                    const blob = new Blob(chunks, { type: 'audio/mpeg' });
+                    const audioUrl = URL.createObjectURL(blob);
+                    resolve(audioUrl);
+                } else if (message.type === 'error') {
+                    console.error('TTS Error:', message.message);
+                    ws.close();
+                    resolve(null);
+                }
+            } catch (e) {
+                console.error('Error processing TTS message:', e);
+                ws.close();
+                resolve(null);
+            }
+        };
+
+        ws.onerror = (e) => {
+            console.error('WebSocket error:', e);
+            resolve(null);
+        };
+    });
   }
 
   const mediaSource = new MediaSource();
