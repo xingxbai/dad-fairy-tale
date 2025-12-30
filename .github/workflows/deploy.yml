@@ -16,6 +16,8 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           port: 22
+          # 将 GitHub Secrets 注入到环境变量中
+          envs: VITE_VOLC_TTS_APPID,VITE_VOLC_TTS_TOKEN,VITE_OPENAI_API_KEY,VITE_OPENAI_BASE_URL,VITE_OPENAI_MODEL
           script: |
             # 1. 进入项目目录
             cd ${{ secrets.PROJECT_PATH }}
@@ -24,13 +26,27 @@ jobs:
             git fetch --all
             git reset --hard origin/main
             
-            # 3. 安装依赖 (包括构建工具)
+            # 3. 自动生成 .env 文件 (解决服务器缺少环境变量的问题)
+            echo "VITE_VOLC_TTS_APPID=$VITE_VOLC_TTS_APPID" > .env
+            echo "VITE_VOLC_TTS_TOKEN=$VITE_VOLC_TTS_TOKEN" >> .env
+            echo "VITE_OPENAI_API_KEY=$VITE_OPENAI_API_KEY" >> .env
+            # 如果有配置这两个可选变量，也写入
+            if [ ! -z "$VITE_OPENAI_BASE_URL" ]; then echo "VITE_OPENAI_BASE_URL=$VITE_OPENAI_BASE_URL" >> .env; fi
+            if [ ! -z "$VITE_OPENAI_MODEL" ]; then echo "VITE_OPENAI_MODEL=$VITE_OPENAI_MODEL" >> .env; fi
+            
+            # 4. 安装依赖 (包括构建工具)
             npm install
             
-            # 4. 在服务器上构建
+            # 5. 在服务器上构建
             npm run build
             
-            # 5. 重启服务
+            # 6. 重启服务
             pm2 reload all || pm2 start server.js --name "dad-fairy-tale"
             
             echo "Deployment successful!"
+        env:
+          VITE_VOLC_TTS_APPID: ${{ secrets.VITE_VOLC_TTS_APPID }}
+          VITE_VOLC_TTS_TOKEN: ${{ secrets.VITE_VOLC_TTS_TOKEN }}
+          VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY }}
+          VITE_OPENAI_BASE_URL: ${{ secrets.VITE_OPENAI_BASE_URL }}
+          VITE_OPENAI_MODEL: ${{ secrets.VITE_OPENAI_MODEL }}
