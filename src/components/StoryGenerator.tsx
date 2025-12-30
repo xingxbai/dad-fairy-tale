@@ -117,7 +117,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
           }
       };
 
-      ws.onclose = (event) => {
+      ws.onclose = () => {
           if (!isComplete) {
               console.log('WebSocket closed unexpectedly');
               setIsGenerating(false);
