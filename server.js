@@ -372,19 +372,15 @@ wss.on('connection', (ws, req) => {
 
       } else if (data.type === 'generate_story') {
         console.log(`[${new Date().toISOString()}] Received generate_story request for: ${data.title}`);
-        const { title, prompt, type, ...extraParams } = data;
+        const { title, prompt } = data;
         
-        const API_KEY = process.env.VITE_OPENAI_API_KEY;
-        const BASE_URL = (process.env.VITE_OPENAI_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3').replace(/\/$/, '');
-        const MODEL = process.env.VITE_OPENAI_MODEL || 'ep-20240604-xxxxx';
-
-        if (!API_KEY) {
-            ws.send(JSON.stringify({ type: 'error', message: 'API Key not configured on server' }));
-            return;
-        }
+        // SiliconFlow API Configuration
+        const API_KEY = 'sk-dzmbqursqauctwedlliqflvcjndhsaebsyculmcnfetshpbt';
+        const BASE_URL = 'https://api.siliconflow.cn/v1';
+        const MODEL = 'Qwen/Qwen3-8B';
 
         try {
-            console.log(`[${new Date().toISOString()}] Sending request to LLM API...`);
+            console.log(`[${new Date().toISOString()}] Sending request to LLM API (SiliconFlow)...`);
             const response = await fetch(`${BASE_URL}/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -403,9 +399,7 @@ wss.on('connection', (ws, req) => {
                       content: prompt,
                     },
                   ],
-                  temperature: 0.8,
-                  stream: true,
-                  ...extraParams
+                  stream: true
                 }),
             });
 
