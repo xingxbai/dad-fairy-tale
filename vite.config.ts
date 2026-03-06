@@ -7,6 +7,11 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     proxy: {
+      '/api/tts-stream': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api/v1/tts': {
         target: 'https://openspeech.bytedance.com',
         changeOrigin: true,

@@ -21,6 +21,171 @@ const PORT = process.env.PORT || 3000;
 // Serve static files from the dist directory
 app.use(express.static(path.join(__dirname, 'dist')));
 
+// TTS Stream Cache
+const streamRequests = new Map();
+
+// Endpoint for initializing a TTS stream
+app.post('/api/tts-stream/init', express.json(), (req, res) => {
+    const { text, voiceId } = req.body;
+    if (!text || !voiceId) {
+        return res.status(400).json({ error: 'Missing text or voiceId' });
+    }
+
+    const streamId = uuidv4();
+    streamRequests.set(streamId, { text, voiceId, createdAt: Date.now() });
+
+    // Cleanup old requests every time (simple cleanup)
+    const now = Date.now();
+    for (const [id, data] of streamRequests.entries()) {
+        if (now - data.createdAt > 30000) { // 30 seconds expiration
+            streamRequests.delete(id);
+        }
+    }
+
+    res.json({ streamId });
+});
+
+// Endpoint for streaming TTS audio
+app.get('/api/tts-stream/:streamId', (req, res) => {
+    const { streamId } = req.params;
+    const requestData = streamRequests.get(streamId);
+
+    if (!requestData) {
+        return res.status(404).send('Stream not found or expired');
+    }
+
+    streamRequests.delete(streamId); // One-time use
+
+    const { text, voiceId } = requestData;
+    const ttsAppId = process.env.VITE_VOLC_TTS_APPID;
+    const ttsToken = process.env.VITE_VOLC_TTS_TOKEN;
+    const isClonedVoice = voiceId?.startsWith('S_');
+    const reqId = uuidv4();
+
+    let requestJson = {
+        app: {
+            appid: "4286079913",
+            token: "ITT5YA2nqX5VIHe97Sjw2dvTlZ7b9GSp",
+            cluster: "volcano_tts"
+        },
+        user: { uid: "user_1" },
+        audio: {
+            voice_type: "zh_female_xueayi_saturn_bigtts", // Default, will be overridden
+            encoding: "mp3",
+            speed_ratio: 0.9,
+            emotion: "neutral" // Default
+        },
+        request: {
+            reqid: reqId,
+            text: text,
+            operation: "submit"
+        }
+    };
+
+    if (isClonedVoice) {
+        requestJson = {
+            app: {
+                appid: ttsAppId,
+                token: ttsToken,
+                cluster: 'volcano_icl',
+            },
+            user: { uid: "user_1" },
+            audio: {
+                voice_type: voiceId,
+                encoding: "mp3",
+                speed_ratio: 0.9,
+            },
+            request: {
+                reqid: reqId,
+                text: text,
+                operation: "submit"
+            }
+        };
+    } else {
+        // Update voiceId only, keep other defaults from initialization
+        requestJson.audio.voice_type = voiceId;
+    }
+
+    // Response Header
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    // Connect to Volcengine WebSocket
+    const volcWs = new WebSocket('wss://openspeech.bytedance.com/api/v1/tts/ws_binary', {
+        headers: {
+            Authorization: `Bearer;${isClonedVoice ? ttsToken : "ITT5YA2nqX5VIHe97Sjw2dvTlZ7b9GSp"}`
+        },
+        skipUTF8Validation: true
+    });
+
+    volcWs.on('open', () => {
+        const payload = zlib.gzipSync(JSON.stringify(requestJson));
+        const header = Buffer.from([0x11, 0x10, 0x11, 0x00]);
+        const sizeBuffer = Buffer.alloc(4);
+        sizeBuffer.writeUInt32BE(payload.length, 0);
+        const packet = Buffer.concat([header, sizeBuffer, payload]);
+        volcWs.send(packet);
+    });
+
+    volcWs.on('message', (data) => {
+        const msgType = (data[1] >> 4) & 0x0F;
+        const compression = data[2] & 0x0F;
+        
+        if (msgType === 0xB) { // Audio response
+            const headerSize = (data[0] & 0x0F) * 4;
+            let offset = headerSize;
+            const flags = data[1] & 0x0F;
+            if (flags & 0x01) offset += 4; // seq
+            offset += 4; // payload size
+
+            if (offset <= data.length) {
+                let audioData = data.slice(offset);
+                if (compression === 1) { // Gzip compressed
+                    try {
+                        audioData = zlib.gunzipSync(audioData);
+                    } catch (e) {
+                        console.error('Gunzip error', e);
+                        return;
+                    }
+                }
+                if (audioData.length > 0) {
+                    res.write(audioData);
+                }
+                if (flags & 0x02) { // Last message
+                    res.end();
+                    volcWs.close();
+                }
+            }
+        } else if (msgType === 0xF) { // Error
+            const headerSize = (data[0] & 0x0F) * 4;
+            const errorPayload = data.slice(headerSize).toString();
+            console.error('Volcengine TTS Error:', errorPayload);
+            // Don't res.end() here immediately if we want to send error status, but since headers are sent...
+            // better to just close connection
+            res.end(); 
+            volcWs.close();
+        }
+    });
+
+    volcWs.on('error', (err) => {
+        console.error('Volcengine WS Error:', err);
+        res.end();
+    });
+
+    volcWs.on('close', () => {
+        if (!res.writableEnded) {
+            res.end();
+        }
+    });
+    
+    // Handle client disconnect
+    req.on('close', () => {
+        if (volcWs.readyState === WebSocket.OPEN) {
+            volcWs.close();
+        }
+    });
+});
+
 // Proxy configuration
 const proxyOptions = {
   target: 'https://openspeech.bytedance.com',

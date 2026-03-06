@@ -1,168 +1,23 @@
 export const generateTTS = async (text: string, voiceId: string): Promise<string | null> => {
-  const ttsAppId = import.meta.env.VITE_VOLC_TTS_APPID;
-  const ttsToken = import.meta.env.VITE_VOLC_TTS_TOKEN;
-
-  if (!ttsAppId || !ttsToken) {
-    console.error('TTS AppID or Token missing');
-    return null;
-  }
-
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-  // Fallback for iOS/Browsers without MediaSource support
-  if (!('MediaSource' in window) || isIOS) {
-    return new Promise((resolve) => {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        let wsUrl = `${wsProtocol}//${window.location.host}`;
-        
-        if (import.meta.env.DEV) {
-            wsUrl = `ws://${window.location.hostname}:3000`;
-        }
-
-        const ws = new WebSocket(wsUrl);
-        ws.binaryType = 'arraybuffer';
-        const chunks: BlobPart[] = [];
-
-        ws.onopen = () => {
-            ws.send(JSON.stringify({
-                type: 'tts',
-                text: text,
-                voiceId: voiceId
-            }));
-        };
-
-        ws.onmessage = (event) => {
-            try {
-                const message = JSON.parse(event.data);
-                if (message.type === 'welcome') {
-                    // Ignore welcome message for TTS service if present, or handle it
-                    return;
-                }
-                if (message.type === 'tts_audio') {
-                    const binaryString = atob(message.data);
-                    const len = binaryString.length;
-                    const bytes = new Uint8Array(len);
-                    for (let i = 0; i < len; i++) {
-                        bytes[i] = binaryString.charCodeAt(i);
-                    }
-                    chunks.push(bytes.buffer);
-                } else if (message.type === 'tts_complete') {
-                    ws.close();
-                    const blob = new Blob(chunks, { type: 'audio/mpeg' });
-                    const audioUrl = URL.createObjectURL(blob);
-                    resolve(audioUrl);
-                } else if (message.type === 'error') {
-                    console.error('TTS Error:', message.message);
-                    ws.close();
-                    resolve(null);
-                }
-            } catch (e) {
-                console.error('Error processing TTS message:', e);
-                ws.close();
-                resolve(null);
-            }
-        };
-
-        ws.onerror = (e) => {
-            console.error('WebSocket error:', e);
-            resolve(null);
-        };
+  try {
+    const response = await fetch('/api/tts-stream/init', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text, voiceId }),
     });
-  }
 
-  const mediaSource = new MediaSource();
-  const audioUrl = URL.createObjectURL(mediaSource);
-
-  mediaSource.addEventListener('sourceopen', () => {
-    const sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
-    
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let wsUrl = `${wsProtocol}//${window.location.host}`;
-    
-    if (import.meta.env.DEV) {
-        wsUrl = `ws://${window.location.hostname}:3000`;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to initialize TTS stream:', response.status, errorText);
+      return null;
     }
 
-    const ws = new WebSocket(wsUrl);
-    ws.binaryType = 'arraybuffer';
-    
-    const queue: ArrayBuffer[] = [];
-
-    const processQueue = () => {
-      if (queue.length > 0 && !sourceBuffer.updating) {
-        try {
-          const chunk = queue.shift();
-          if (chunk) {
-            sourceBuffer.appendBuffer(chunk);
-          }
-        } catch (e) {
-          console.error('SourceBuffer append error', e);
-        }
-      }
-    };
-
-    sourceBuffer.addEventListener('updateend', () => {
-      processQueue();
-      if (queue.length === 0 && ws.readyState === WebSocket.CLOSED && mediaSource.readyState === 'open' && !sourceBuffer.updating) {
-        try {
-            mediaSource.endOfStream();
-        } catch (e) {
-            console.error('endOfStream error', e);
-        }
-      }
-    });
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify({
-        type: 'tts',
-        text: text,
-        voiceId: voiceId
-      }));
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        
-        if (message.type === 'tts_audio') {
-            const binaryString = atob(message.data);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            queue.push(bytes.buffer);
-            processQueue();
-        } else if (message.type === 'tts_complete') {
-            ws.close();
-            if (queue.length === 0 && !sourceBuffer.updating && mediaSource.readyState === 'open') {
-                mediaSource.endOfStream();
-            }
-        } else if (message.type === 'error') {
-            console.error('TTS Error:', message.message);
-            ws.close();
-            if (mediaSource.readyState === 'open') {
-                mediaSource.endOfStream('network');
-            }
-        }
-      } catch (e) {
-        console.error('Error processing TTS message:', e);
-      }
-    };
-
-    ws.onerror = (e) => {
-      console.error('WebSocket error:', e);
-      if (mediaSource.readyState === 'open') {
-        mediaSource.endOfStream('network');
-      }
-    };
-
-    mediaSource.addEventListener('sourceclose', () => {
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.close();
-        }
-    });
-  });
-
-  return audioUrl;
+    const { streamId } = await response.json();
+    return `/api/tts-stream/${streamId}`;
+  } catch (error) {
+    console.error('Error generating TTS:', error);
+    return null;
+  }
 };
