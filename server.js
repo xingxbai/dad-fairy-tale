@@ -377,93 +377,109 @@ wss.on('connection', (ws, req) => {
         // SiliconFlow API Configuration
         const API_KEY = 'sk-dzmbqursqauctwedlliqflvcjndhsaebsyculmcnfetshpbt';
         const BASE_URL = 'https://api.siliconflow.cn/v1';
-        const MODEL = 'Qwen/Qwen3-8B';
+        // Models fallbacks (Plan A, Plan B, Plan C...)
+        const MODELS = [
+            'Qwen/Qwen3-8B',                   // Plan A: Main Model
+            'Qwen/Qwen2.5-7B-Instruct',        // Plan B: Backup
+            'THUDM/glm-4-9b-chat',             // Plan C: Backup
+            'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B' // Plan D: Fallback
+        ];
 
-        try {
-            console.log(`[${new Date().toISOString()}] Sending request to LLM API (SiliconFlow)...`);
-            const response = await fetch(`${BASE_URL}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${API_KEY}`,
-                },
-                body: JSON.stringify({
-                  model: MODEL,
-                  messages: [
-                    {
-                      role: 'system',
-                      content: '你是一个会讲故事的爸爸。请直接讲故事内容，不要返回JSON，不要包含标题，不要使用Markdown格式。',
+        let success = false;
+        let lastError = null;
+
+        for (const model of MODELS) {
+            try {
+                console.log(`[${new Date().toISOString()}] Attempting to generate story with model: ${model}...`);
+                const response = await fetch(`${BASE_URL}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${API_KEY}`,
                     },
-                    {
-                      role: 'user',
-                      content: prompt,
-                    },
-                  ],
-                  stream: true
-                }),
-            });
-
-            console.log(`[${new Date().toISOString()}] Received response headers from LLM API. Status: ${response.status}`);
-
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`API Error: ${response.status} ${errText}`);
-            }
-
-            // Handle streaming response
-            const decoder = new TextDecoder();
-            let buffer = '';
-            let isFirstChunk = true;
-
-            // Use for await loop for Node.js native fetch stream
-            // @ts-ignore
-            for await (const chunk of response.body) {
-                if (isFirstChunk) {
-                    console.log(`[${new Date().toISOString()}] Received first chunk of data from LLM API`);
-                    isFirstChunk = false;
+                    body: JSON.stringify({
+                      model: model,
+                      messages: [
+                        {
+                          role: 'system',
+                          content: '你是一个会讲故事的爸爸。请直接讲故事内容，不要返回JSON，不要包含标题，不要使用Markdown格式。',
+                        },
+                        {
+                          role: 'user',
+                          content: prompt,
+                        },
+                      ],
+                      stream: true
+                    }),
+                });
+    
+                console.log(`[${new Date().toISOString()}] Received response headers from ${model} API. Status: ${response.status}`);
+    
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`API Error (${model}): ${response.status} ${errText}`);
                 }
-                const text = decoder.decode(chunk, { stream: true });
-                // console.log(`[${new Date().toISOString()}] Received chunk: ${JSON.stringify(text.substring(0, 50))}...`);
-
-                buffer += text;
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
-                    
-                    const data = trimmedLine.slice(6);
-                    if (data === '[DONE]') continue;
-
-                    try {
-                        const json = JSON.parse(data);
-                        const delta = json.choices[0]?.delta;
-                        const content = delta?.content;
-                        const reasoning = delta?.reasoning_content;
+    
+                // Handle streaming response
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let isFirstChunk = true;
+    
+                // Use for await loop for Node.js native fetch stream
+                // @ts-ignore
+                for await (const chunk of response.body) {
+                    if (isFirstChunk) {
+                        console.log(`[${new Date().toISOString()}] Received first chunk of data from ${model}`);
+                        isFirstChunk = false;
+                    }
+                    const text = decoder.decode(chunk, { stream: true });
+    
+                    buffer += text;
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+    
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
                         
-                        if (content) {
-                            console.log(`[${new Date().toISOString()}] Sending chunk to client: ${JSON.stringify(content).substring(0, 20)}...`);
-                            ws.send(JSON.stringify({ type: 'story_chunk', chunk: content }));
-                        } else if (reasoning) {
-                            // Send reasoning to client
-                            // console.log(`[${new Date().toISOString()}] Sending reasoning chunk...`);
-                            ws.send(JSON.stringify({ type: 'story_reasoning', chunk: reasoning }));
-                        } else {
-                            // Log if we receive a packet but no content (e.g. reasoning or empty delta)
-                            console.log(`[${new Date().toISOString()}] Received packet without content. Keys: ${Object.keys(delta || {})}`);
+                        const data = trimmedLine.slice(6);
+                        if (data === '[DONE]') continue;
+    
+                        try {
+                            const json = JSON.parse(data);
+                            const delta = json.choices[0]?.delta;
+                            const content = delta?.content;
+                            const reasoning = delta?.reasoning_content;
+                            
+                            if (content) {
+                                console.log(`[${new Date().toISOString()}] Sending chunk to client: ${JSON.stringify(content).substring(0, 20)}...`);
+                                ws.send(JSON.stringify({ type: 'story_chunk', chunk: content }));
+                            } else if (reasoning) {
+                                ws.send(JSON.stringify({ type: 'story_reasoning', chunk: reasoning }));
+                            }
+                        } catch (e) {
+                            console.error('Error parsing stream data:', e);
                         }
-                    } catch (e) {
-                        console.error('Error parsing stream data:', e);
                     }
                 }
+                
+                ws.send(JSON.stringify({ type: 'story_complete' }));
+                success = true;
+                break; // Exit loop on success
+    
+            } catch (error) {
+                console.error(`Error with model ${model}:`, error.message);
+                lastError = error;
+                // If it's the last model, we will handle the error after the loop
+                if (model !== MODELS[MODELS.length - 1]) {
+                    console.log(`Switching to next plan...`);
+                }
             }
-            
-            ws.send(JSON.stringify({ type: 'story_complete' }));
+        }
 
-        } catch (error) {
-            console.error('API Error:', error);
-            ws.send(JSON.stringify({ type: 'error', message: error.message }));
+        if (!success) {
+            console.error('All models failed to generate story.');
+            ws.send(JSON.stringify({ type: 'error', message: lastError ? lastError.message : 'All models failed.' }));
         }
       }
     } catch (error) {
