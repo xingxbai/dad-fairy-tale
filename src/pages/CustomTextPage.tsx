@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { AudioPlayer } from '../components/AudioPlayer';
 import { generateTTS } from '../services/ttsService';
-import { ArrowLeft, Mic, PlayCircle } from 'lucide-react';
+import { ArrowLeft, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useVoice } from '../contexts/VoiceContext';
 import { VoiceSelector } from '../components/VoiceSelector';
+import { VoiceInput } from '../components/VoiceInput';
 
 export function CustomTextPage() {
   const [text, setText] = useState('');
@@ -49,7 +50,6 @@ export function CustomTextPage() {
             <Link to="/" className="mr-4 text-gray-600 hover:text-primary-600">
               <ArrowLeft className="w-6 h-6" />
             </Link>
-            <Mic className="w-6 h-6 text-primary-600 mr-2" />
             <h1 className="text-lg font-bold text-primary-900">自定义播放</h1>
           </div>
           <VoiceSelector color="purple" />
@@ -58,9 +58,12 @@ export function CustomTextPage() {
 
       <main className="container mx-auto px-4 pt-8 max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-8">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            输入你想听的内容
-          </label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-sm font-medium text-gray-700">
+              输入你想听的内容
+            </label>
+            <VoiceInput onInput={(val) => setText(prev => prev + val)} />
+          </div>
           <textarea
             className="w-full h-40 p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none mb-4"
             placeholder="在这里输入故事内容..."

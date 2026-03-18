@@ -12,16 +12,23 @@ const ANDERSEN_TALES = [
   "单身汉的睡帽", "某某", "依卜和小克里斯汀", "梦神", "枞树"
 ];
 
+interface InteractionData {
+  question: string;
+  options: Array<{ label: string; value: string; emoji: string; }>;
+}
+
 interface StoryGeneratorProps {
   onStoryGenerated: (story: Story) => void;
   onStreamUpdate?: (content: string) => void;
   onReasoningUpdate?: (reasoning: string) => void;
   onGenerationStart?: (title: string) => void;
+  onInteraction?: (data: InteractionData, submitChoice: (choice: string) => void) => void;
   voiceId?: string;
   topics?: string[];
   promptTemplate?: (title: string) => string;
   mockContent?: (title: string) => string;
   className?: string;
+  mode?: 'classic' | 'interactive';
 }
 
 export const StoryGenerator: React.FC<StoryGeneratorProps> = ({ 
@@ -29,12 +36,16 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
   onStreamUpdate,
   onReasoningUpdate,
   onGenerationStart,
+  onInteraction,
   topics = ANDERSEN_TALES,
   promptTemplate = (title) => `请给我讲一个关于《${title}》的故事，保留原著所有的故事情节，但适合胎教。`,
   mockContent,
-  className = ''
+  className = '',
+  mode = 'classic'
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  // Keep WS reference to send messages later
+  const [wsRef, setWsRef] = useState<WebSocket | null>(null);
 
   const generateStory = async (title: string) => {
     setIsGenerating(true);
@@ -55,13 +66,17 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
       }
 
       const ws = new WebSocket(wsUrl);
+      setWsRef(ws);
+      
       let currentContent = '';
       let currentReasoning = '';
+      let buffer = ''; // Buffer for detecting tags
 
       ws.onopen = () => {
           try {
+            const messageType = mode === 'interactive' ? 'generate_interactive_story' : 'generate_story';
             ws.send(JSON.stringify({
-                type: 'generate_story',
+                type: messageType, 
                 title: title,
                 prompt: promptTemplate(title)
             }));
@@ -77,12 +92,75 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
                   return;
               }
               if (message.type === 'story_chunk') {
-                  currentContent += message.chunk;
-                  onStreamUpdate?.(currentContent);
+                  const chunk = message.chunk;
+                  buffer += chunk;
+
+                  // Check for Interaction Tags
+                  // Case 1: Buffer contains complete tag
+                  const interactionStart = buffer.indexOf('[INTERACTION]');
+                  const interactionEnd = buffer.indexOf('[/INTERACTION]');
+
+                  if (interactionStart !== -1 && interactionEnd !== -1) {
+                      // We have a complete interaction block
+                      const beforeTag = buffer.substring(0, interactionStart);
+                      const interactionJson = buffer.substring(interactionStart + 13, interactionEnd);
+                      
+                      // Process the text before the tag
+                      // Filter out [STORY] tags if present in the text
+                      const cleanContent = (currentContent + beforeTag).replace(/\[STORY\]|\[\/STORY\]/g, '');
+                      currentContent = cleanContent;
+                      onStreamUpdate?.(currentContent);
+
+                      // Process Interaction
+                      try {
+                          const data = JSON.parse(interactionJson);
+                          onInteraction?.(data, (choiceVal) => {
+                              ws.send(JSON.stringify({
+                                  type: 'continue_story',
+                                  choice: choiceVal
+                              }));
+                          });
+                      } catch (e) {
+                          console.error('Failed to parse interaction JSON', e);
+                      }
+                      
+                      // Clear buffer after tag (or keep resting text? Usually Interaction is at end)
+                      buffer = buffer.substring(interactionEnd + 14); 
+
+                  } else if (interactionStart !== -1) {
+                      // We have a start tag, but not end tag yet. 
+                      // Render everything BEFORE the start tag
+                      const beforeTag = buffer.substring(0, interactionStart);
+                      if (beforeTag) {
+                           const cleanContent = (currentContent + beforeTag).replace(/\[STORY\]|\[\/STORY\]/g, '');
+                           currentContent = cleanContent; 
+                           onStreamUpdate?.(currentContent);
+                           buffer = buffer.substring(interactionStart); // Keep start tag in buffer
+                      }
+                  } else {
+                      // No start tag, safe to append to content? 
+                      // Wait, we can't be sure unless we know we are not IN a tag.
+                      // Simple approach: Render everything if buffer length > 200 (tag shouldn't be that long without start)
+                      // Or just render immediately and hide tag via CSS later? No, better parsing.
+                      // For simplicity: If buffer doesn't contain '[', render it.
+                      if (!buffer.includes('[')) {
+                           currentContent += buffer;
+                           onStreamUpdate?.(currentContent.replace(/\[STORY\]|\[\/STORY\]/g, ''));
+                           buffer = '';
+                      }
+                  }
+
               } else if (message.type === 'story_reasoning') {
                   currentReasoning += message.chunk;
                   onReasoningUpdate?.(currentReasoning);
               } else if (message.type === 'story_complete') {
+                  // ... existing complete logic ...
+                  // Ensure buffer is flushed
+                  if (buffer) {
+                      currentContent += buffer.replace(/\[STORY\]|\[\/STORY\]/g, '');
+                      onStreamUpdate?.(currentContent);
+                  }
+                  
                   isComplete = true;
                   const newStory: Story = {
                       id: Date.now().toString(),
@@ -91,12 +169,67 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
                       coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80'
                   };
                   
+                  // Don't close WS here if we want to allow more interactions? 
+                  // Actually 'story_complete' usually comes when done. 
+                  // But our server sends turn_complete. 
+                  // Let's assume 'story_complete' means REALLY done.
+                  
                   setTimeout(() => {
                       onStoryGenerated(newStory);
                       setIsGenerating(false);
-                  }, 500); // Short delay to ensure last chunk is rendered
+                  }, 500); 
                   ws.close();
-              } else if (message.type === 'error') {
+              } else if (message.type === 'story_turn_complete') {
+                   // Turn is done, analyze buffer for any missed interactions
+                   if (buffer) {
+                       const interactionStart = buffer.indexOf('[INTERACTION]');
+                       if (interactionStart !== -1) {
+                           // Try to parse interaction from whatever is left
+                           // Remove start tag, and remove end tag if present
+                           let jsonStr = buffer.substring(interactionStart + 13);
+                           const endTagIndex = jsonStr.lastIndexOf('[/INTERACTION]');
+                           if (endTagIndex !== -1) {
+                               jsonStr = jsonStr.substring(0, endTagIndex);
+                           }
+                           
+                           // Clean up markdown code blocks if any
+                           jsonStr = jsonStr.trim().replace(/^```json\s*/, '').replace(/\s*```$/, '');
+                           
+                           try {
+                               const data = JSON.parse(jsonStr);
+                               // Flush any text BEFORE the interaction tag first
+                               const beforeTag = buffer.substring(0, interactionStart);
+                               if (beforeTag.trim()) {
+                                   currentContent += beforeTag.replace(/\[STORY\]|\[\/STORY\]/g, '');
+                                   onStreamUpdate?.(currentContent);
+                               }
+
+                               onInteraction?.(data, (choiceVal) => {
+                                  ws.send(JSON.stringify({
+                                      type: 'continue_story',
+                                      choice: choiceVal
+                                  }));
+                               });
+                           } catch (e) {
+                               console.error('Failed to parse final interaction block:', e);
+                               // Fallback: Dump everything as text so user sees SOMETHING
+                               const cleanText = buffer.replace(/\[STORY\]|\[\/STORY\]/g, '')
+                               // Maybe hide the raw interaction block from user? 
+                               // No, better to show it if debugging, but for prod maybe hide
+                               currentContent += cleanText; 
+                               onStreamUpdate?.(currentContent);
+                           }
+                       } else {
+                           // Just normal text remaining
+                           if (buffer.trim()) {
+                               currentContent += buffer.replace(/\[STORY\]|\[\/STORY\]/g, '');
+                               onStreamUpdate?.(currentContent);
+                           }
+                       }
+                       buffer = '';
+                   }
+              }
+              else if (message.type === 'error') {
                   console.error('Story generation error:', message.message);
                   alert(`生成故事失败: ${message.message}`);
                   isComplete = true;

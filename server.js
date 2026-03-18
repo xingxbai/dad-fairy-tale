@@ -224,8 +224,97 @@ wss.on('connection', (ws, req) => {
     console.error(`WebSocket error with ${clientIp}:`, err);
   });
 
+  // Helper function to call LLM and stream response
+  async function streamStoryFromLLM(ws, messages) {
+      const API_KEY = 'sk-dzmbqursqauctwedlliqflvcjndhsaebsyculmcnfetshpbt';
+      const BASE_URL = 'https://api.siliconflow.cn/v1';
+      
+      const MODELS = [
+          // 'Qwen/Qwen2.5-7B-Instruct',
+          'Qwen/Qwen3-8B',
+          'THUDM/glm-4-9b-chat',
+          'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'
+      ];
+
+      let success = false;
+      let lastError = null;
+      let fullResponseText = '';
+
+      for (const model of MODELS) {
+          try {
+              console.log(`[${new Date().toISOString()}] Attempting to generate story with model: ${model}...`);
+              const response = await fetch(`${BASE_URL}/chat/completions`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${API_KEY}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: messages,
+                    stream: true,
+                    temperature: 0.7, 
+                    max_tokens: 512   
+                  }),
+              });
+
+              if (!response.ok) {
+                  const errText = await response.text();
+                  throw new Error(`API Error (${model}): ${response.status} ${errText}`);
+              }
+
+              const decoder = new TextDecoder();
+              let buffer = '';
+              
+              // @ts-ignore
+              for await (const chunk of response.body) {
+                  const text = decoder.decode(chunk, { stream: true });
+                  buffer += text;
+                  const lines = buffer.split('\n');
+                  buffer = lines.pop() || '';
+
+                  for (const line of lines) {
+                      const trimmedLine = line.trim();
+                      if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+                      
+                      const data = trimmedLine.slice(6);
+                      if (data === '[DONE]') continue;
+
+                      try {
+                          const json = JSON.parse(data);
+                          const delta = json.choices[0]?.delta;
+                          
+                          if (delta?.content) {
+                              fullResponseText += delta.content;
+                              ws.send(JSON.stringify({ type: 'story_chunk', chunk: delta.content }));
+                          }
+                          if (delta?.reasoning_content) {
+                              ws.send(JSON.stringify({ type: 'story_reasoning', chunk: delta.reasoning_content }));
+                          }
+                      } catch (e) {
+                          // ignore
+                      }
+                  }
+              }
+              
+              ws.send(JSON.stringify({ type: 'story_turn_complete' }));
+              return fullResponseText;
+
+          } catch (error) {
+              console.error(`Error with model ${model}:`, error.message);
+              lastError = error;
+          }
+      }
+
+      if (!success) {
+          console.error('All models failed.');
+          ws.send(JSON.stringify({ type: 'error', message: lastError ? lastError.message : 'All models failed.' }));
+      }
+      return null;
+  }
+
   ws.on('message', async (message) => {
-    console.log(`Received message from ${clientIp}: ${message.toString().slice(0, 100)}...`);
+    console.log(`Received message from ${clientIp}: ${typeof message === 'string' ? message.slice(0, 50) : 'binary'}`);
     try {
       const data = JSON.parse(message);
       
@@ -240,9 +329,8 @@ wss.on('connection', (ws, req) => {
         }
 
         const isClonedVoice = voiceId?.startsWith('S_');
-        
-        // Construct Volcengine Request
         const reqId = uuidv4();
+        
         let requestJson = {
             app: {
                 appid: "4286079913",
@@ -284,7 +372,6 @@ wss.on('connection', (ws, req) => {
             };
         }
 
-        // Connect to Volcengine WebSocket
         const volcWs = new WebSocket('wss://openspeech.bytedance.com/api/v1/tts/ws_binary', {
             headers: {
                 Authorization: `Bearer;${isClonedVoice ? ttsToken : "ITT5YA2nqX5VIHe97Sjw2dvTlZ7b9GSp"}`
@@ -294,13 +381,8 @@ wss.on('connection', (ws, req) => {
 
         volcWs.on('open', () => {
             const payload = zlib.gzipSync(JSON.stringify(requestJson));
-            // Protocol version 1 (0x1), Header size 1 (0x1 * 4 = 4 bytes)
-            // Message type: Full client request (0x1), No sequence (0x0) => 0x10
-            // Serialization: JSON (0x1), Compression: Gzip (0x1) => 0x11
-            // Reserved: 0x00
             const header = Buffer.from([0x11, 0x10, 0x11, 0x00]);
             
-            // Payload Size (4 bytes)
             const sizeBuffer = Buffer.alloc(4);
             sizeBuffer.writeUInt32BE(payload.length, 0);
 
@@ -317,22 +399,17 @@ wss.on('connection', (ws, req) => {
                 let offset = headerSize;
                 
                 const flags = data[1] & 0x0F;
-                // If bit 0 of flags is set, there is a 4-byte sequence number
-                if (flags & 0x01) { 
+                if (flags & 0x01) {
                     offset += 4;
                 }
-                // There is always a 4-byte payload size
                 offset += 4; 
 
                 if (offset > data.length) {
-                    // Should not happen if protocol is correct, but safety check
-                    console.error('TTS Protocol Error: Offset exceeds data length');
                     return;
                 }
 
                 let audioData = data.slice(offset);
-                
-                if (compression === 1) { // Gzip compressed
+                if (compression === 1) { 
                     try {
                         audioData = zlib.gunzipSync(audioData);
                     } catch (e) {
@@ -348,7 +425,7 @@ wss.on('connection', (ws, req) => {
                     }));
                 }
 
-                if (flags & 0x02) { // Last message (bit 1)
+                if (flags & 0x02) { 
                     ws.send(JSON.stringify({ type: 'tts_complete' }));
                     volcWs.close();
                 }
@@ -366,129 +443,109 @@ wss.on('connection', (ws, req) => {
             ws.send(JSON.stringify({ type: 'error', message: 'TTS Connection Error' }));
         });
 
-        volcWs.on('close', () => {
-            // console.log('Volcengine connection closed');
-        });
-
       } else if (data.type === 'generate_story') {
-        console.log(`[${new Date().toISOString()}] Received generate_story request for: ${data.title}`);
+        const { title } = data;
+        ws.storyHistory = [
+            {
+                role: 'system',
+                content: `你是专为0-5岁宝宝设计的“故事爸爸”。
+请讲一个关于《${title}》的睡前故事。
+要求：
+1. 语气亲切、温柔，多用叠词（如“大大的”、“红红的”），充满童趣。
+2. 故事要完整，逻辑通顺，适合哄睡。
+3. 不需要互动，请一次性把故事讲完，字数控制在500字左右。`
+            },
+            {
+                role: 'user',
+                content: "请开始讲故事。"
+            }
+        ];
+        console.log(`[${new Date().toISOString()}] Starting classic story: ${title}`);
+        const response = await streamStoryFromLLM(ws, ws.storyHistory);
+        if (response) {
+            ws.storyHistory.push({ role: 'assistant', content: response });
+        }
+        // Send completion signal for classic mode so frontend knows to show "Play" button
+        ws.send(JSON.stringify({ type: 'story_complete' }));
+
+      } else if (data.type === 'generate_interactive_story') {
         const { title, prompt } = data;
         
-        // SiliconFlow API Configuration
-        const API_KEY = 'sk-dzmbqursqauctwedlliqflvcjndhsaebsyculmcnfetshpbt';
-        const BASE_URL = 'https://api.siliconflow.cn/v1';
-        // Models fallbacks (Plan A, Plan B, Plan C...)
-        const MODELS = [
-            'Qwen/Qwen3-8B',                   // Plan A: Main Model
-            'Qwen/Qwen2.5-7B-Instruct',        // Plan B: Backup
-            'THUDM/glm-4-9b-chat',             // Plan C: Backup
-            'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B' // Plan D: Fallback
+        ws.storyHistory = [
+            {
+                role: 'system',
+                content: `你是专为0-5岁宝宝设计的“故事爸爸”。
+请讲一个关于《${title}》的互动故事。
+
+【核心人设与风格】
+1. **身份**：你是一个温暖、耐心的爸爸，正在给0-5岁的宝宝讲睡前故事。
+2. **语言**：
+   - 语气亲切、温柔，充满爱意。
+   - 多使用叠词（如“红红的”、“高高的”、“慢慢地”）。
+   - 多使用拟声词（如“呼呼”、“通通通”）。
+   - 句式简单，避免使用长句和复杂的逻辑词。
+
+【故事结构与互动要求】
+1. **分段讲述**：每次只讲一小段情节（约100字左右），确保宝宝能跟上。
+2. **必须互动**：讲完一段后，**必须**停下来，向宝宝提问，让宝宝参与决定接下来的故事发展。
+3. **选项逻辑**：
+   - 选项必须**紧扣刚才的剧情**，符合故事的逻辑线索。
+   - 选项内容可以是**决定主角的行动**（如“往左走”还是“往右走”）。
+   - 选项内容也可以是**猜测原因或感受**（如“他是不是饿了？”还是“他是不是想找妈妈？”），但必须要符合常理。
+   - **重要**：对于经典童话（如皇帝的新装），选项要符合原著逻辑或简单的儿童逻辑（如“被骗子骗了”），**严禁**出现“害羞”、“调皮”等不符合剧情语境的莫名其妙的选项。
+
+【输出格式规范】
+每次回复末尾**必须**且**只能**包含一个JSON数据块（不要使用Markdown代码块，直接输出文本），格式如下：
+
+[INTERACTION]
+{
+  "question": "（这里填入根据刚才情节设计的引导性问题，语气要像爸爸在问宝宝）",
+  "options": [
+    { "label": "（选项1：简短、行动或回答）", "value": "（选项1代表的故事走向简述）", "emoji": "（匹配的Emoji）" },
+    { "label": "（选项2：简短、行动或回答）", "value": "（选项2代表的故事走向简述）", "emoji": "（匹配的Emoji）" }
+  ]
+}
+[/INTERACTION]
+`
+            },
+            {
+                role: 'user',
+                content: "开始讲故事吧！"
+            }
         ];
 
-        let success = false;
-        let lastError = null;
-
-        for (const model of MODELS) {
-            try {
-                console.log(`[${new Date().toISOString()}] Attempting to generate story with model: ${model}...`);
-                const response = await fetch(`${BASE_URL}/chat/completions`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${API_KEY}`,
-                    },
-                    body: JSON.stringify({
-                      model: model,
-                      messages: [
-                        {
-                          role: 'system',
-                          content: '你是一个会讲故事的爸爸。请直接讲故事内容，不要返回JSON，不要包含标题，不要使用Markdown格式。',
-                        },
-                        {
-                          role: 'user',
-                          content: prompt,
-                        },
-                      ],
-                      stream: true
-                    }),
-                });
-    
-                console.log(`[${new Date().toISOString()}] Received response headers from ${model} API. Status: ${response.status}`);
-    
-                if (!response.ok) {
-                    const errText = await response.text();
-                    throw new Error(`API Error (${model}): ${response.status} ${errText}`);
-                }
-    
-                // Handle streaming response
-                const decoder = new TextDecoder();
-                let buffer = '';
-                let isFirstChunk = true;
-    
-                // Use for await loop for Node.js native fetch stream
-                // @ts-ignore
-                for await (const chunk of response.body) {
-                    if (isFirstChunk) {
-                        console.log(`[${new Date().toISOString()}] Received first chunk of data from ${model}`);
-                        isFirstChunk = false;
-                    }
-                    const text = decoder.decode(chunk, { stream: true });
-    
-                    buffer += text;
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-    
-                    for (const line of lines) {
-                        const trimmedLine = line.trim();
-                        if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
-                        
-                        const data = trimmedLine.slice(6);
-                        if (data === '[DONE]') continue;
-    
-                        try {
-                            const json = JSON.parse(data);
-                            const delta = json.choices[0]?.delta;
-                            const content = delta?.content;
-                            const reasoning = delta?.reasoning_content;
-                            
-                            if (content) {
-                                console.log(`[${new Date().toISOString()}] Sending chunk to client: ${JSON.stringify(content).substring(0, 20)}...`);
-                                ws.send(JSON.stringify({ type: 'story_chunk', chunk: content }));
-                            } else if (reasoning) {
-                                ws.send(JSON.stringify({ type: 'story_reasoning', chunk: reasoning }));
-                            }
-                        } catch (e) {
-                            console.error('Error parsing stream data:', e);
-                        }
-                    }
-                }
-                
-                ws.send(JSON.stringify({ type: 'story_complete' }));
-                success = true;
-                break; // Exit loop on success
-    
-            } catch (error) {
-                console.error(`Error with model ${model}:`, error.message);
-                lastError = error;
-                // If it's the last model, we will handle the error after the loop
-                if (model !== MODELS[MODELS.length - 1]) {
-                    console.log(`Switching to next plan...`);
-                }
-            }
+        console.log(`[${new Date().toISOString()}] Starting new story: ${title}`);
+        const response = await streamStoryFromLLM(ws, ws.storyHistory);
+        if (response) {
+            ws.storyHistory.push({ role: 'assistant', content: response });
         }
 
-        if (!success) {
-            console.error('All models failed to generate story.');
-            ws.send(JSON.stringify({ type: 'error', message: lastError ? lastError.message : 'All models failed.' }));
-        }
+      } else if (data.type === 'continue_story') {
+          const { choice } = data;
+          console.log(`[${new Date().toISOString()}] Continuing story with choice: ${choice}`);
+          
+          if (!ws.storyHistory) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Story session expired. Please restart.' }));
+              return;
+          }
+
+          ws.storyHistory.push({
+              role: 'user',
+              content: `我选择：${choice}。请继续讲故事！记得讲完一段后再次给出互动选项。`
+          });
+          
+          const response = await streamStoryFromLLM(ws, ws.storyHistory);
+          if (response) {
+              ws.storyHistory.push({ role: 'assistant', content: response });
+          }
       }
+
     } catch (error) {
       console.error('WebSocket error:', error);
       ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
     }
   });
 
-  // Keep-alive interval
   const keepAliveInterval = setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
       ws.ping();
@@ -499,4 +556,4 @@ wss.on('connection', (ws, req) => {
     console.log('Client disconnected');
     clearInterval(keepAliveInterval);
   });
-});
+}); 

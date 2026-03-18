@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BookOpen, Mic, Globe, Scroll, Moon } from 'lucide-react';
+import { BookOpen, Mic, Globe, Scroll, Moon, Gamepad2 } from 'lucide-react';
 
 export function Home() {
   return (
@@ -11,6 +11,17 @@ export function Home() {
       </header>
 
       <main className="container mx-auto px-4 pt-8 max-w-md space-y-4 pb-10">
+        <Link to="/interactive-story" className="block">
+          <div className="bg-white p-6 rounded-2xl shadow-md hover:shadow-xl transition-shadow flex items-center space-x-4 cursor-pointer border border-transparent hover:border-pink-200">
+            <div className="bg-pink-100 p-4 rounded-full">
+              <Gamepad2 className="w-8 h-8 text-pink-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">互动故事</h2>
+              <p className="text-gray-500 text-sm">宝宝自己决定故事结局，更有趣！</p>
+            </div>
+          </div>
+        </Link>
         <Link to="/fairy-tale" className="block">
           <div className="bg-white p-6 rounded-2xl shadow-md hover:shadow-xl transition-shadow flex items-center space-x-4 cursor-pointer border border-transparent hover:border-primary-200">
             <div className="bg-primary-100 p-4 rounded-full">
