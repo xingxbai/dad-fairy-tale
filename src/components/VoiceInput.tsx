@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, Loader2 } from 'lucide-react';
+import { Mic, MicOff } from 'lucide-react';
 
 interface VoiceInputProps {
   onInput: (text: string) => void;
@@ -10,7 +10,6 @@ interface VoiceInputProps {
 export const VoiceInput: React.FC<VoiceInputProps> = ({ 
   onInput, 
   className = '',
-  placeholder = '点击开始说话...' 
 }) => {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(true);

@@ -47,7 +47,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   // Keep WS reference to send messages later
-  const [wsRef, setWsRef] = useState<WebSocket | null>(null);
+  const [_wsRef, setWsRef] = useState<WebSocket | null>(null);
 
   const generateStory = async (title: string) => {
     setIsGenerating(true);

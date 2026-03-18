@@ -2,11 +2,9 @@ import { useState } from 'react';
 import { StoryGenerator } from '../components/StoryGenerator';
 import { StoryDisplay } from '../components/StoryDisplay';
 import { InteractiveOptions } from '../components/InteractiveOptions';
-import { generateTTS } from '../services/ttsService';
 import type { Story, UserState } from '../types';
-import { BookOpen, ArrowLeft, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, Gamepad2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useVoice } from '../contexts/VoiceContext';
 import { VoiceSelector } from '../components/VoiceSelector';
 
 export function InteractiveStoryPage() {
@@ -14,7 +12,6 @@ export function InteractiveStoryPage() {
     voiceId: null,
     currentStory: null,
   });
-  const { dadVoiceId, voiceId } = useVoice();
 
   // Streaming state
   const [isGenerating, setIsGenerating] = useState(false);
