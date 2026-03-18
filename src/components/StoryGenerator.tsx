@@ -23,6 +23,7 @@ interface StoryGeneratorProps {
   onReasoningUpdate?: (reasoning: string) => void;
   onGenerationStart?: (title: string) => void;
   onInteraction?: (data: InteractionData, submitChoice: (choice: string) => void) => void;
+  onExampleImageGenerated?: (url: string) => void;
   voiceId?: string;
   topics?: string[];
   promptTemplate?: (title: string) => string;
@@ -37,6 +38,7 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
   onReasoningUpdate,
   onGenerationStart,
   onInteraction,
+  onExampleImageGenerated,
   topics = ANDERSEN_TALES,
   promptTemplate = (title) => `请给我讲一个关于《${title}》的故事，保留原著所有的故事情节，但适合胎教。`,
   mockContent,
@@ -90,6 +92,10 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
               const message = JSON.parse(event.data);
               if (message.type === 'welcome') {
                   return;
+              }
+              if (message.type === 'story_image') {
+                  // Handle Image
+                  onExampleImageGenerated?.(message.url);
               }
               if (message.type === 'story_chunk') {
                   const chunk = message.chunk;

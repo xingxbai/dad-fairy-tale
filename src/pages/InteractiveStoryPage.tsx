@@ -19,6 +19,7 @@ export function InteractiveStoryPage() {
   // Streaming state
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingStory, setStreamingStory] = useState<{title: string, content: string, reasoning: string} | null>(null);
+  const [storyImage, setStoryImage] = useState<string>('');
   
   // Interaction State
   const [interaction, setInteraction] = useState<{
@@ -30,6 +31,7 @@ export function InteractiveStoryPage() {
       setIsGenerating(true);
       setStreamingStory({ title: title, content: '', reasoning: '' });
       setInteraction(null);
+      setStoryImage('');
   };
 
   const handleStreamUpdate = (content: string) => {
@@ -38,6 +40,10 @@ export function InteractiveStoryPage() {
   
   const handleReasoningUpdate = (reasoning: string) => {
       setStreamingStory(prev => prev ? { ...prev, reasoning } : null);
+  };
+  
+  const handleImageUpdate = (url: string) => {
+      setStoryImage(url);
   };
 
   const handleInteraction = (data: any, submit: (c: string) => void) => {
@@ -80,9 +86,20 @@ export function InteractiveStoryPage() {
             {/* 1. Generating Mode (Streaming & Interaction) */}
             {isGenerating && streamingStory && (
               <div className="space-y-6 animate-fade-in">
+                {/* Story Image Section */}
+                {storyImage && (
+                    <div className="relative w-full aspect-square rounded-2xl overflow-hidden shadow-lg border-4 border-white">
+                        <img 
+                            src={storyImage} 
+                            alt="Story Scene" 
+                            className="w-full h-full object-cover animate-fade-in"
+                        />
+                    </div>
+                )}
+                
                 <StoryDisplay 
                   title={streamingStory.title} 
-                  content={streamingStory.content} 
+                  content={streamingStory.content}  
                   reasoning={streamingStory.reasoning}
                   isStreaming={true}
                 />
@@ -130,6 +147,7 @@ export function InteractiveStoryPage() {
                 onStreamUpdate={handleStreamUpdate}
                 onReasoningUpdate={handleReasoningUpdate}
                 onGenerationStart={handleGenerationStart}
+                onExampleImageGenerated={handleImageUpdate}
                 onInteraction={handleInteraction}
               />
             </div>

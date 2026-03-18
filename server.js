@@ -313,10 +313,57 @@ wss.on('connection', (ws, req) => {
       return null;
   }
 
+  // Helper function to generate Image
+  async function generateImage(ws, prompt) {
+      const API_KEY = 'sk-dzmbqursqauctwedlliqflvcjndhsaebsyculmcnfetshpbt';
+      // Use SiliconFlow's correct endpoint for Images
+      // Note: SiliconFlow API is OpenAI Compatible, but sometimes specific models need different paths.
+      // Standard OpenAI: /v1/images/generations
+      const BASE_URL = 'https://api.siliconflow.cn/v1';
+
+      try {
+          console.log(`[${new Date().toISOString()}] Generating image for prompt: ${prompt}`);
+          const response = await fetch(`${BASE_URL}/images/generations`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${API_KEY}`,
+              },
+              body: JSON.stringify({
+                  model: "black-forest-labs/FLUX.1-schnell", 
+                  prompt: `(masterpiece), (best quality), children's book illustration for 0-5 year olds, cute, soft lighting, warm colors, watercolor style, simple composition, detailed character. Scene description: ${prompt}`,
+                  image_size: "1024x1024",
+                  seed: Math.floor(Math.random() * 10000000) // Random seed to ensure variety
+              }),
+          });
+
+
+          if (!response.ok) {
+              const errText = await response.text();
+              console.error('Image Generation API Error:', errText);
+              return;
+          }
+
+          const data = await response.json();
+          if (data.data && data.data[0]?.url) {
+              console.log('Image generated successfully');
+              ws.send(JSON.stringify({ 
+                  type: 'story_image', 
+                  url: data.data[0].url 
+              }));
+          }
+
+      } catch (error) {
+          console.error('Image generation failed:', error);
+      }
+  }
+
   ws.on('message', async (message) => {
-    console.log(`Received message from ${clientIp}: ${typeof message === 'string' ? message.slice(0, 50) : 'binary'}`);
+    const rawMessage = message.toString();
+    console.log(`Received message from ${clientIp}: ${rawMessage.slice(0, 50)}`);
     try {
-      const data = JSON.parse(message);
+      // Ensure message is parsed as string, sometimes it comes as Buffer
+      const data = JSON.parse(rawMessage);
       
       if (data.type === 'tts') {
         const { text, voiceId } = data;
@@ -470,6 +517,7 @@ wss.on('connection', (ws, req) => {
 
       } else if (data.type === 'generate_interactive_story') {
         const { title, prompt } = data;
+        ws.storyTitle = title; // Store title for later use
         
         ws.storyHistory = [
             {
@@ -515,6 +563,10 @@ wss.on('connection', (ws, req) => {
         ];
 
         console.log(`[${new Date().toISOString()}] Starting new story: ${title}`);
+        
+        // Trigger Image Generation in Parallel
+        generateImage(ws, `Close-up of main character in the story "${title}". Cute, friendly, fairy tale style.`);
+
         const response = await streamStoryFromLLM(ws, ws.storyHistory);
         if (response) {
             ws.storyHistory.push({ role: 'assistant', content: response });
@@ -534,7 +586,15 @@ wss.on('connection', (ws, req) => {
               content: `我选择：${choice}。请继续讲故事！记得讲完一段后再次给出互动选项。`
           });
           
+          // Retrieve previous context
+          const lastStorySegment = ws.storyHistory.filter(m => m.role === 'assistant').pop()?.content || ws.storyTitle;
+          const cleanSegment = lastStorySegment.replace(/\[INTERACTION\][\s\S]*?\[\/INTERACTION\]/g, '').slice(-300);
+
+          // Trigger Image Generation in Parallel based on choice and context
+          generateImage(ws, `Story: "${ws.storyTitle}". Action: The character chooses to ${choice}. Previous context: ${cleanSegment}`);
+          
           const response = await streamStoryFromLLM(ws, ws.storyHistory);
+
           if (response) {
               ws.storyHistory.push({ role: 'assistant', content: response });
           }
@@ -542,7 +602,12 @@ wss.on('connection', (ws, req) => {
 
     } catch (error) {
       console.error('WebSocket error:', error);
-      ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+      // Only send error if we can construct a valid JSON
+      try {
+          ws.send(JSON.stringify({ type: 'error', message: `Invalid message format: ${error.message}` }));
+      } catch (e) {
+          console.error('Failed to send error message:', e);
+      }
     }
   });
 
