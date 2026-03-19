@@ -3,10 +3,10 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
-import WebSocket from 'ws';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
-import zlib from 'zlib';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
+
 
 // Load env vars from .env.local if it exists, otherwise .env
 dotenv.config({ path: '.env.local' });
@@ -24,15 +24,37 @@ app.use(express.static(path.join(__dirname, 'dist')));
 // TTS Stream Cache
 const streamRequests = new Map();
 
+
+// Helper to map old Volcengine voices to Edge TTS voices
+function mapVoiceId(voiceId) {
+    if (!voiceId) return 'zh-CN-XiaoxiaoNeural'; // Default female
+    
+    // Check if it's already an Edge TTS voice (heuristic: contains Neural)
+    if (voiceId.includes('Neural')) return voiceId;
+
+    // Map specific Volcengine IDs
+    // S_pkpEVvSN1 (Dad voice/Cloned) -> zh-CN-YunxiNeural (Male)
+    if (voiceId.startsWith('S_')) return 'zh-CN-YunxiNeural';
+    
+    // zh_female_xueayi_saturn_bigtts (Standard female) -> zh-CN-XiaoxiaoNeural
+    if (voiceId.includes('female')) return 'zh-CN-XiaoxiaoNeural';
+    
+    // Default fallback
+    return 'zh-CN-XiaoxiaoNeural';
+}
+
 // Endpoint for initializing a TTS stream
 app.post('/api/tts-stream/init', express.json(), (req, res) => {
     const { text, voiceId } = req.body;
-    if (!text || !voiceId) {
-        return res.status(400).json({ error: 'Missing text or voiceId' });
+    if (!text) {
+        return res.status(400).json({ error: 'Missing text' });
     }
 
     const streamId = uuidv4();
-    streamRequests.set(streamId, { text, voiceId, createdAt: Date.now() });
+    // Resolve voiceId to Edge TTS format immediately
+    const edgeVoiceId = mapVoiceId(voiceId);
+    
+    streamRequests.set(streamId, { text, voiceId: edgeVoiceId, createdAt: Date.now() });
 
     // Cleanup old requests every time (simple cleanup)
     const now = Date.now();
@@ -46,7 +68,7 @@ app.post('/api/tts-stream/init', express.json(), (req, res) => {
 });
 
 // Endpoint for streaming TTS audio
-app.get('/api/tts-stream/:streamId', (req, res) => {
+app.get('/api/tts-stream/:streamId', async (req, res) => {
     const { streamId } = req.params;
     const requestData = streamRequests.get(streamId);
 
@@ -57,146 +79,35 @@ app.get('/api/tts-stream/:streamId', (req, res) => {
     streamRequests.delete(streamId); // One-time use
 
     const { text, voiceId } = requestData;
-    const ttsAppId = process.env.VITE_VOLC_TTS_APPID;
-    const ttsToken = process.env.VITE_VOLC_TTS_TOKEN;
-    const isClonedVoice = voiceId?.startsWith('S_');
-    const reqId = uuidv4();
 
-    let requestJson = {
-        app: {
-            appid: "4286079913",
-            token: "ITT5YA2nqX5VIHe97Sjw2dvTlZ7b9GSp",
-            cluster: "volcano_tts"
-        },
-        user: { uid: "user_1" },
-        audio: {
-            voice_type: "zh_female_xueayi_saturn_bigtts", // Default, will be overridden
-            encoding: "mp3",
-            speed_ratio: 0.9,
-            emotion: "neutral" // Default
-        },
-        request: {
-            reqid: reqId,
-            text: text,
-            operation: "submit"
-        }
-    };
-
-    if (isClonedVoice) {
-        requestJson = {
-            app: {
-                appid: ttsAppId,
-                token: ttsToken,
-                cluster: 'volcano_icl',
-            },
-            user: { uid: "user_1" },
-            audio: {
-                voice_type: voiceId,
-                encoding: "mp3",
-                speed_ratio: 0.9,
-            },
-            request: {
-                reqid: reqId,
-                text: text,
-                operation: "submit"
-            }
-        };
-    } else {
-        // Update voiceId only, keep other defaults from initialization
-        requestJson.audio.voice_type = voiceId;
-    }
-
-    // Response Header
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Transfer-Encoding', 'chunked');
-
-    // Connect to Volcengine WebSocket
-    const volcWs = new WebSocket('wss://openspeech.bytedance.com/api/v1/tts/ws_binary', {
-        headers: {
-            Authorization: `Bearer;${isClonedVoice ? ttsToken : "ITT5YA2nqX5VIHe97Sjw2dvTlZ7b9GSp"}`
-        },
-        skipUTF8Validation: true
-    });
-
-    volcWs.on('open', () => {
-        const payload = zlib.gzipSync(JSON.stringify(requestJson));
-        const header = Buffer.from([0x11, 0x10, 0x11, 0x00]);
-        const sizeBuffer = Buffer.alloc(4);
-        sizeBuffer.writeUInt32BE(payload.length, 0);
-        const packet = Buffer.concat([header, sizeBuffer, payload]);
-        volcWs.send(packet);
-    });
-
-    volcWs.on('message', (data) => {
-        const msgType = (data[1] >> 4) & 0x0F;
-        const compression = data[2] & 0x0F;
+    try {
+        const tts = new MsEdgeTTS();
         
-        if (msgType === 0xB) { // Audio response
-            const headerSize = (data[0] & 0x0F) * 4;
-            let offset = headerSize;
-            const flags = data[1] & 0x0F;
-            if (flags & 0x01) offset += 4; // seq
-            offset += 4; // payload size
-
-            if (offset <= data.length) {
-                let audioData = data.slice(offset);
-                if (compression === 1) { // Gzip compressed
-                    try {
-                        audioData = zlib.gunzipSync(audioData);
-                    } catch (e) {
-                        console.error('Gunzip error', e);
-                        return;
-                    }
-                }
-                if (audioData.length > 0) {
-                    res.write(audioData);
-                }
-                if (flags & 0x02) { // Last message
-                    res.end();
-                    volcWs.close();
-                }
-            }
-        } else if (msgType === 0xF) { // Error
-            const headerSize = (data[0] & 0x0F) * 4;
-            const errorPayload = data.slice(headerSize).toString();
-            console.error('Volcengine TTS Error:', errorPayload);
-            // Don't res.end() here immediately if we want to send error status, but since headers are sent...
-            // better to just close connection
-            res.end(); 
-            volcWs.close();
-        }
-    });
-
-    volcWs.on('error', (err) => {
-        console.error('Volcengine WS Error:', err);
-        res.end();
-    });
-
-    volcWs.on('close', () => {
-        if (!res.writableEnded) {
+        // Use high quality output format
+        await tts.setMetadata(voiceId, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+        
+        const { audioStream } = await tts.toStream(text);
+        
+        // Response Header
+        res.setHeader('Content-Type', 'audio/mpeg');
+        // Transfer-Encoding chunked is automatic in express when piping
+        
+        audioStream.pipe(res);
+        
+        audioStream.on('error', (err) => {
+            console.error('Edge TTS Stream Error:', err);
+            // Can't send error response if headers sent, but end stream
             res.end();
-        }
-    });
-    
-    // Handle client disconnect
-    req.on('close', () => {
-        if (volcWs.readyState === WebSocket.OPEN) {
-            volcWs.close();
-        }
-    });
+        });
+
+    } catch (error) {
+        console.error('Edge TTS Error:', error);
+        res.status(500).send('TTS Generation Failed');
+    }
 });
 
-// Proxy configuration
-const proxyOptions = {
-  target: 'https://openspeech.bytedance.com',
-  changeOrigin: true,
-  secure: false,
-};
-
-app.use('/api/v1/tts', createProxyMiddleware(proxyOptions));
-app.use('/api/v1/mega_tts', createProxyMiddleware(proxyOptions));
-
 // Handle SPA routing: return index.html for all non-API requests
+
 app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
@@ -367,128 +278,37 @@ wss.on('connection', (ws, req) => {
       
       if (data.type === 'tts') {
         const { text, voiceId } = data;
-        const ttsAppId = process.env.VITE_VOLC_TTS_APPID;
-        const ttsToken = process.env.VITE_VOLC_TTS_TOKEN;
+        const edgeVoiceId = mapVoiceId(voiceId);
 
-        if (!ttsAppId || !ttsToken) {
-            ws.send(JSON.stringify({ type: 'error', message: 'TTS credentials missing on server' }));
-            return;
-        }
-
-        const isClonedVoice = voiceId?.startsWith('S_');
-        const reqId = uuidv4();
-        
-        let requestJson = {
-            app: {
-                appid: "4286079913",
-                token: "ITT5YA2nqX5VIHe97Sjw2dvTlZ7b9GSp",
-                cluster: "volcano_tts"
-            },
-            user: { uid: "user_1" },
-            audio: {
-                voice_type: "zh_female_xueayi_saturn_bigtts",
-                encoding: "mp3",
-                speed_ratio: 0.9
-            },
-            request: {
-                reqid: reqId,
-                text: text,
-                operation: "submit"
-            }
-        };
-
-        if (isClonedVoice) {
-            requestJson = {
-                app: {
-                    appid: ttsAppId,
-                    token: ttsToken,
-                    cluster: 'volcano_icl',
-                },
-                user: { uid: 'user_1' },
-                audio: {
-                    voice_type: voiceId,
-                    encoding: "mp3",
-                    speed_ratio: 0.9,
-                    emotion: "neutral"
-                },
-                request: {
-                    reqid: reqId,
-                    text: text,
-                    operation: 'submit',
-                },
-            };
-        }
-
-        const volcWs = new WebSocket('wss://openspeech.bytedance.com/api/v1/tts/ws_binary', {
-            headers: {
-                Authorization: `Bearer;${isClonedVoice ? ttsToken : "ITT5YA2nqX5VIHe97Sjw2dvTlZ7b9GSp"}`
-            },
-            skipUTF8Validation: true
-        });
-
-        volcWs.on('open', () => {
-            const payload = zlib.gzipSync(JSON.stringify(requestJson));
-            const header = Buffer.from([0x11, 0x10, 0x11, 0x00]);
+        try {
+            const tts = new MsEdgeTTS();
+            await tts.setMetadata(edgeVoiceId, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+            const { audioStream } = await tts.toStream(text);
             
-            const sizeBuffer = Buffer.alloc(4);
-            sizeBuffer.writeUInt32BE(payload.length, 0);
-
-            const packet = Buffer.concat([header, sizeBuffer, payload]);
-            volcWs.send(packet);
-        });
-
-        volcWs.on('message', (data) => {
-            const msgType = (data[1] >> 4) & 0x0F;
-            const compression = data[2] & 0x0F;
+            audioStream.on('data', (chunk) => {
+                 ws.send(JSON.stringify({ 
+                    type: 'tts_audio', 
+                    data: chunk.toString('base64') 
+                }));
+            });
             
-            if (msgType === 0xB) { // Audio-only server response
-                const headerSize = (data[0] & 0x0F) * 4;
-                let offset = headerSize;
-                
-                const flags = data[1] & 0x0F;
-                if (flags & 0x01) {
-                    offset += 4;
-                }
-                offset += 4; 
-
-                if (offset > data.length) {
-                    return;
-                }
-
-                let audioData = data.slice(offset);
-                if (compression === 1) { 
-                    try {
-                        audioData = zlib.gunzipSync(audioData);
-                    } catch (e) {
-                        console.error('TTS Audio Gunzip error:', e);
-                        return;
-                    }
-                }
-
-                if (audioData.length > 0) {
-                    ws.send(JSON.stringify({ 
-                        type: 'tts_audio', 
-                        data: audioData.toString('base64') 
-                    }));
-                }
-
-                if (flags & 0x02) { 
-                    ws.send(JSON.stringify({ type: 'tts_complete' }));
-                    volcWs.close();
-                }
-            } else if (msgType === 0xF) { // Error
-                const headerSize = (data[0] & 0x0F) * 4;
-                const errorPayload = data.slice(headerSize).toString();
-                console.error('Volcengine TTS Error:', errorPayload);
-                ws.send(JSON.stringify({ type: 'error', message: `TTS Error: ${errorPayload}` }));
-                volcWs.close();
+            // Wait for stream to end before sending completion
+            audioStream.on('end', () => {
+                ws.send(JSON.stringify({ type: 'tts_complete' }));
+            });
+            
+            audioStream.on('error', (err) => {
+                console.error('Edge TTS Stream Error:', err);
+                ws.send(JSON.stringify({ type: 'error', message: 'TTS Generation Error' }));
+            });
+            
+        } catch (error) {
+            console.error('Edge TTS Error:', error);
+            // Only send if WS is open
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'error', message: `TTS Error: ${error.message}` }));
             }
-        });
-
-        volcWs.on('error', (err) => {
-            console.error('Volcengine WebSocket Error:', err);
-            ws.send(JSON.stringify({ type: 'error', message: 'TTS Connection Error' }));
-        });
+        }
 
       } else if (data.type === 'generate_story') {
         const { title } = data;
