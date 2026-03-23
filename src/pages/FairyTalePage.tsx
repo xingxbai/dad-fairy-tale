@@ -6,7 +6,7 @@ import { StoryDisplay } from '../components/StoryDisplay';
 import { InteractiveOptions } from '../components/InteractiveOptions';
 import { generateTTS } from '../services/ttsService';
 import type { Story, UserState } from '../types';
-import { BookOpen, ArrowLeft } from 'lucide-react';
+import { BookOpen, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useVoice } from '../contexts/VoiceContext';
 
@@ -85,10 +85,12 @@ export function FairyTalePage() {
           setUserState(prev => ({ ...prev, currentStory: { ...prev.currentStory!, audioUrl } }));
           setIsPlaying(true);
         } else {
+          setIsGeneratingAudio(false);
           alert("语音生成失败，请重试");
         }
-      } finally {
+      } catch (error) {
         setIsGeneratingAudio(false);
+        console.error("TTS generation error:", error);
       }
     }
   };
@@ -108,22 +110,22 @@ export function FairyTalePage() {
       </header>
 
       <main className="container mx-auto px-4 pt-8 max-w-md">
-        { false ? (
+        {false ? (
           <VoiceRecorder />
         ) : (
           <div className="space-y-8">
             {/* 1. Generating Mode (Streaming & Interaction) */}
             {isGenerating && (
               <div className="space-y-6 animate-fade-in">
-                <StoryDisplay 
-                  title={streamingStory?.title} 
-                  content={streamingStory?.content || ''} 
+                <StoryDisplay
+                  title={streamingStory?.title}
+                  content={streamingStory?.content || ''}
                   reasoning={streamingStory?.reasoning}
                   isStreaming={true}
                 />
-                
+
                 {interaction && (
-                  <InteractiveOptions 
+                  <InteractiveOptions
                     question={interaction.data.question}
                     options={interaction.data.options}
                     onSelect={onOptionSelected}
@@ -135,22 +137,33 @@ export function FairyTalePage() {
             {/* 2. Finished Mode (Audio Player + Text) */}
             {!isGenerating && userState.currentStory && (
               <div className="space-y-6 animate-fade-in">
-                <AudioPlayer 
+                <AudioPlayer
                   title={userState.currentStory.title}
                   audioUrl={userState.currentStory.audioUrl}
                   isPlaying={isPlaying}
                   isLoading={isGeneratingAudio}
                   onPlayPause={handlePlayPause}
-                  onNext={() => {}} 
+                  onNext={() => {}}
                   onPrev={() => {}}
+                  onLoaded={() => setIsGeneratingAudio(false)}
                 />
-                
-                <StoryDisplay 
-                  content={userState.currentStory.content} 
-                />
-                
-                <button 
-                  onClick={() => setUserState(prev => ({ ...prev, currentStory: null }))}
+                {isGeneratingAudio && (
+                  <div className="flex flex-col items-center justify-center space-y-2 py-4 text-primary-600 animate-pulse">
+                    <div className="flex items-center space-x-2">
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      <span className="text-sm font-medium italic">
+                        爸爸正在给你准备好听的故事，请稍等一下哦...
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <StoryDisplay content={userState.currentStory.content} />
+
+                <button
+                  onClick={() =>
+                    setUserState((prev) => ({ ...prev, currentStory: null }))
+                  }
                   className="w-full py-3 text-primary-600 font-medium hover:bg-primary-50 rounded-xl transition-colors border border-primary-100"
                 >
                   讲个新故事
@@ -161,8 +174,14 @@ export function FairyTalePage() {
             {/* 3. Story Generator (Topic Selection) 
                 ALWAYS Rendered but hidden when generating/playing to maintain WebSocket state 
             */}
-            <div className={isGenerating || (userState.currentStory !== null) ? 'hidden' : 'block'}>
-              <StoryGenerator 
+            <div
+              className={
+                isGenerating || userState.currentStory !== null
+                  ? 'hidden'
+                  : 'block'
+              }
+            >
+              <StoryGenerator
                 mode="classic"
                 onStoryGenerated={handleStoryGenerated}
                 onStreamUpdate={handleStreamUpdate}
@@ -171,12 +190,11 @@ export function FairyTalePage() {
                 onInteraction={handleInteraction}
               />
             </div>
-            
+
             {/* Special Case: If generating, we need StoryGenerator mounted but hidden. 
                 The above condition `isGenerating ? 'hidden'` covers it. 
                 Wait, if isGenerating is TRUE, className is 'hidden'. Perfect.
             */}
-
           </div>
         )}
       </main>

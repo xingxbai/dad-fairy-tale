@@ -5,7 +5,7 @@ import { AudioPlayer } from '../components/AudioPlayer';
 import { StoryDisplay } from '../components/StoryDisplay';
 import { generateTTS } from '../services/ttsService';
 import type { Story, UserState } from '../types';
-import { BookOpen, ArrowLeft } from 'lucide-react';
+import { BookOpen, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BEDTIME_STORIES } from '../data/topics';
 import { useVoice } from '../contexts/VoiceContext';
@@ -64,10 +64,12 @@ export function BedtimeStoryPage() {
           setUserState(prev => ({ ...prev, currentStory: { ...prev.currentStory!, audioUrl } }));
           setIsPlaying(true);
         } else {
+          setIsGeneratingAudio(false);
           alert("语音生成失败，请重试");
         }
-      } finally {
+      } catch (error) {
         setIsGeneratingAudio(false);
+        console.error("TTS generation error:", error);
       }
     }
   };
@@ -136,7 +138,17 @@ export function BedtimeStoryPage() {
                   onPlayPause={handlePlayPause}
                   onNext={() => {}}
                   onPrev={() => {}}
+                  onLoaded={() => setIsGeneratingAudio(false)}
                 />
+
+                {isGeneratingAudio && (
+                  <div className="flex flex-col items-center justify-center space-y-2 py-4 text-indigo-600 animate-pulse">
+                    <div className="flex items-center space-x-2">
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      <span className="text-sm font-medium italic">爸爸正在给你准备好听的故事，请稍等一下哦...</span>
+                    </div>
+                  </div>
+                )}
                 
                 <StoryDisplay content={userState.currentStory.content} />
                 

@@ -11,6 +11,7 @@ interface AudioPlayerProps {
   onPlayPause: () => void;
   onNext: () => void;
   onPrev: () => void;
+  onLoaded?: () => void;
 }
 
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
@@ -21,7 +22,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   isLoading = false,
   onPlayPause,
   onNext,
-  onPrev
+  onPrev,
+  onLoaded
 }) => {
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -68,6 +70,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     }
   };
 
+  const handleCanPlay = () => {
+    console.log("Audio can play now");
+    if (onLoaded) {
+      onLoaded();
+    }
+  };
+
   const handleEnded = () => {
     onNext();
   };
@@ -87,6 +96,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           src={audioUrl}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
+          onCanPlay={handleCanPlay}
           onEnded={handleEnded}
         />
       )}
