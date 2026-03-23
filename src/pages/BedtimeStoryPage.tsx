@@ -58,14 +58,16 @@ export function BedtimeStoryPage() {
     if (userState.currentStory && (voiceId || true)) {
       setIsGeneratingAudio(true);
       console.log("Generating Bedtime TTS...");
-      const audioUrl = await generateTTS(userState.currentStory.content, voiceId || 'zh-CN-XiaoxiaoNeural');
-      setIsGeneratingAudio(false);
-
-      if (audioUrl) {
-        setUserState(prev => ({ ...prev, currentStory: { ...prev.currentStory!, audioUrl } }));
-        setIsPlaying(true);
-      } else {
-        alert("语音生成失败，请重试");
+      try {
+        const audioUrl = await generateTTS(userState.currentStory.content, voiceId || 'zh-CN-XiaoxiaoNeural');
+        if (audioUrl) {
+          setUserState(prev => ({ ...prev, currentStory: { ...prev.currentStory!, audioUrl } }));
+          setIsPlaying(true);
+        } else {
+          alert("语音生成失败，请重试");
+        }
+      } finally {
+        setIsGeneratingAudio(false);
       }
     }
   };
