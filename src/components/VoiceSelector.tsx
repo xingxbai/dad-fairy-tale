@@ -20,7 +20,7 @@ export const VoiceSelector: React.FC<VoiceSelectorProps> = ({ color = 'blue' }) 
     <div className="flex items-center">
       <select
         value={voiceType}
-        onChange={(e) => setVoiceType('standard')}
+        onChange={() => setVoiceType('standard')}
         className={`text-sm border-none rounded-lg px-3 py-1 focus:ring-2 outline-none cursor-pointer ${colorMap[color]}`}
       >
         <option value="dad">爸爸的声音</option>
