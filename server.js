@@ -60,12 +60,12 @@ app.post('/api/tts-stream/init', express.json(), (req, res) => {
     // Cleanup old requests every time (simple cleanup)
     const now = Date.now();
     for (const [id, data] of streamRequests.entries()) {
-        if (now - data.createdAt > 30000) { // 30 seconds expiration
+        if (now - data.createdAt > 300000) { // Extended to 5 minutes for stability
             streamRequests.delete(id);
         }
     }
 
-    console.log(`[TTS Init] Stream prepared: ${streamId}`);
+    console.log(`[TTS Init] Stream prepared: ${streamId}. Store size: ${streamRequests.size}`);
     res.json({ streamId });
 });
 
@@ -76,12 +76,11 @@ app.get('/api/tts-stream/:streamId', async (req, res) => {
     const requestData = streamRequests.get(streamId);
 
     if (!requestData) {
-        console.warn(`[TTS Stream] Stream ID ${streamId} not found or expired.`);
+        console.warn(`[TTS Stream] Stream ID ${streamId} not found. Available IDs: ${Array.from(streamRequests.keys()).join(', ')}`);
         return res.status(404).send('Stream not found or expired');
     }
 
-    streamRequests.delete(streamId); // One-time use
-
+    // DO NOT streamRequests.delete(streamId) immediately to allow mobile retries
     const { text, voiceId } = requestData;
     console.log(`[TTS Stream] Generating audio with voice: ${voiceId}`);
 
