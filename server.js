@@ -76,42 +76,32 @@ app.get('/api/tts-stream/:streamId', async (req, res) => {
     const requestData = streamRequests.get(streamId);
 
     if (!requestData) {
-        console.warn(`[TTS Stream] Stream ID ${streamId} not found. Available IDs: ${Array.from(streamRequests.keys()).join(', ')}`);
+        console.warn(`[TTS Stream] Stream ID ${streamId} not found.`);
         return res.status(404).send('Stream not found or expired');
     }
 
-    // DO NOT streamRequests.delete(streamId) immediately to allow mobile retries
     const { text, voiceId } = requestData;
-    console.log(`[TTS Stream] Generating audio with voice: ${voiceId}`);
+    console.log(`[TTS Stream] Loading full buffer for stability...`);
 
     try {
         const tts = new MsEdgeTTS();
-        
-        // Use high quality output format
         await tts.setMetadata(voiceId, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
         
-        // request options: rate (negative for slower), volume (0-100 or relative), pitch
-        const { audioStream } = await tts.toStream(text, { 
-            rate: "-15%",   // Slower speed for kids
+        // 关键修改：改回 Buffer 模式。
+        // 虽然初始点击到播放会有 3-5 秒延迟，但它能提供 Content-Length，
+        // 彻底解决移动端因 Range 请求不连贯导致的“7-8秒断连”和“无法拖动进度条”的问题。
+        const buffer = await tts.toBuffer(text, { 
+            rate: "-15%",
         });
         
-        // Most stable headers for mobile playback
+        console.log(`[TTS Stream] Buffer ready: ${buffer.length} bytes. Sending to client...`);
+
         res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', buffer.length);
         res.setHeader('Accept-Ranges', 'bytes');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Transfer-Encoding', 'chunked');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
         
-        console.log(`[TTS Stream] Piping audio stream to client...`);
-        audioStream.pipe(res);
-        
-        audioStream.on('error', (err) => {
-            console.error('[TTS Stream] Edge TTS Stream Error:', err);
-            if (!res.headersSent) {
-                res.status(500).send('Stream Error');
-            } else {
-                res.end();
-            }
-        });
+        res.end(buffer);
 
     } catch (error) {
         console.error('[TTS Stream] Edge TTS Error:', error);
