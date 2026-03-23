@@ -12,6 +12,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/api/animal': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api/v1/tts': {
         target: 'https://openspeech.bytedance.com',
         changeOrigin: true,

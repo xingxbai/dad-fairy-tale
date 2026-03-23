@@ -69,6 +69,60 @@ app.post('/api/tts-stream/init', express.json(), (req, res) => {
     res.json({ streamId });
 });
 
+// In-memory cache for static animal sounds
+const staticAnimalSounds = new Map();
+
+// Endpoint for static animal sounds (fallback/default)
+app.get('/api/animal/static/:animalId', async (req, res) => {
+    const { animalId } = req.params;
+    console.log(`[Static Animal Sound] Request for: ${animalId}`);
+
+    // Check cache first
+    if (staticAnimalSounds.has(animalId)) {
+        const buffer = staticAnimalSounds.get(animalId);
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for a day
+        return res.end(buffer);
+    }
+
+    try {
+        const tts = new MsEdgeTTS();
+        // Simple mapping for default animals
+        const animalMap = {
+            'lion': '我是狮子，大草原上的王者。吼！',
+            'elephant': '我是大象，我的鼻子很长很长。',
+            'cat': '我是小猫，喵喵喵，我最喜欢吃鱼了。',
+            'dog': '我是小狗，汪汪汪，我是人类的好朋友。',
+            'duck': '我是鸭子，嘎嘎嘎，我在水里游来游去。',
+            'rooster': '我是大公鸡，喔喔喔，天亮了快起床。'
+        };
+
+        const text = animalMap[animalId] || `我是${animalId}。`;
+        
+        await tts.setMetadata('zh-CN-YunxiNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+        const { audioStream } = await tts.toStream(text);
+
+        const chunks = [];
+        for await (const chunk of audioStream) {
+            chunks.push(chunk);
+        }
+        const buffer = Buffer.concat(chunks);
+
+        // Cache it
+        staticAnimalSounds.set(animalId, buffer);
+
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.end(buffer);
+
+    } catch (error) {
+        console.error('[Static Animal Sound] Error:', error);
+        res.status(500).send('Error generating sound');
+    }
+});
+
 // Endpoint for streaming TTS audio
 app.get('/api/tts-stream/:streamId', async (req, res) => {
     const { streamId } = req.params;
@@ -78,6 +132,16 @@ app.get('/api/tts-stream/:streamId', async (req, res) => {
     if (!requestData) {
         console.warn(`[TTS Stream] Stream ID ${streamId} not found.`);
         return res.status(404).send('Stream not found or expired');
+    }
+
+    // NEW: Check if we already have a pre-generated buffer (for Animal AI)
+    if (requestData.buffer) {
+        console.log(`[TTS Stream] Sending pre-generated buffer: ${requestData.buffer.length} bytes`);
+        res.header('Content-Type', 'audio/mpeg');
+        res.header('Content-Length', requestData.buffer.length);
+        res.header('Accept-Ranges', 'bytes');
+        res.header('Cache-Control', 'no-cache');
+        return res.send(requestData.buffer);
     }
 
     const { text, voiceId } = requestData;
@@ -114,6 +178,62 @@ app.get('/api/tts-stream/:streamId', async (req, res) => {
         if (!res.headersSent) {
             res.status(500).send('TTS Generation Failed');
         }
+    }
+});
+
+// Endpoint to generate Animal Image and Sound (AI powered)
+app.post('/api/animal/generate', express.json(), async (req, res) => {
+    const { name, englishName } = req.body;
+    console.log(`[Animal AI] Generating resources for: ${name} (${englishName})`);
+
+    const API_KEY = 'sk-dzmbqursqauctwedlliqflvcjndhsaebsyculmcnfetshpbt';
+    const BASE_URL = 'https://api.siliconflow.cn/v1';
+
+    try {
+        // 1. Generate Image using FLUX
+        const imageResponse = await fetch(`${BASE_URL}/images/generations`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${API_KEY}`,
+            },
+            body: JSON.stringify({
+                model: "black-forest-labs/FLUX.1-schnell",
+                prompt: `(masterpiece), (best quality), highly detailed animal portrait of a ${englishName}, children's book illustration style, bright colors, cute, 3d render feel, soft lighting, white background.`,
+                image_size: "1024x1024"
+            }),
+        });
+
+        const imageData = await imageResponse.json();
+        const imageUrl = imageData.data?.[0]?.url;
+
+        // 2. Generate Sound/Voice using Edge TTS (Simulating the sound or reading a description)
+        const tts = new MsEdgeTTS();
+        // Prompt includes the animal's name and its characteristics to make it more interesting
+        const soundDescription = `这是${name}。${name}的英语是 ${englishName}。听，这是它的声音！`; 
+        await tts.setMetadata('zh-CN-YunxiNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+        const { audioStream } = await tts.toStream(soundDescription);
+        
+        const chunks = [];
+        for await (const chunk of audioStream) { chunks.push(chunk); }
+        const buffer = Buffer.concat(chunks);
+        
+        const streamId = uuidv4();
+        // Correctly store as data with a 'buffer' property to match the loader logic
+        streamRequests.set(streamId, { 
+            buffer, 
+            contentType: 'audio/mpeg',
+            createdAt: Date.now() 
+        });
+
+        res.json({
+            image: imageUrl,
+            sound: `/api/tts-stream/${streamId}`
+        });
+
+    } catch (error) {
+        console.error('[Animal AI] Error:', error);
+        res.status(500).json({ error: 'Failed to generate animal resources' });
     }
 });
 

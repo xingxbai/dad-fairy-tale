@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BookOpen, Mic, Globe, Scroll, Moon, Gamepad2 } from 'lucide-react';
+import { BookOpen, Mic, Globe, Scroll, Moon, Gamepad2, Dog } from 'lucide-react';
 
 export function Home() {
   return (
@@ -22,6 +22,19 @@ export function Home() {
             </div>
           </div>
         </Link>
+        
+        <Link to="/animal-recognition" className="block">
+          <div className="bg-white p-6 rounded-2xl shadow-md hover:shadow-xl transition-shadow flex items-center space-x-4 cursor-pointer border border-transparent hover:border-green-200">
+            <div className="bg-green-100 p-4 rounded-full">
+              <Dog className="w-8 h-8 text-green-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">认动物</h2>
+              <p className="text-gray-500 text-sm">看大图，听叫声，认识可爱动物</p>
+            </div>
+          </div>
+        </Link>
+
         <Link to="/fairy-tale" className="block">
           <div className="bg-white p-6 rounded-2xl shadow-md hover:shadow-xl transition-shadow flex items-center space-x-4 cursor-pointer border border-transparent hover:border-primary-200">
             <div className="bg-primary-100 p-4 rounded-full">

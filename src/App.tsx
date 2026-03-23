@@ -6,6 +6,7 @@ import { EnglishStoryPage } from './pages/EnglishStoryPage';
 import { ChineseClassicsPage } from './pages/ChineseClassicsPage';
 import { BedtimeStoryPage } from './pages/BedtimeStoryPage';
 import { InteractiveStoryPage } from './pages/InteractiveStoryPage';
+import { AnimalRecognitionPage } from './pages/AnimalRecognitionPage';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/fairy-tale" element={<FairyTalePage />} />
         <Route path="/interactive-story" element={<InteractiveStoryPage />} />
+        <Route path="/animal-recognition" element={<AnimalRecognitionPage />} />
         <Route path="/english-story" element={<EnglishStoryPage />} />
         <Route path="/chinese-classics" element={<ChineseClassicsPage />} />
         <Route path="/bedtime-story" element={<BedtimeStoryPage />} />
