@@ -88,21 +88,28 @@ app.get('/api/tts-stream/:streamId', async (req, res) => {
         
         const { audioStream } = await tts.toStream(text);
         
-        // Response Header
-        res.setHeader('Content-Type', 'audio/mpeg');
-        // Transfer-Encoding chunked is automatic in express when piping
+        const chunks = [];
+        audioStream.on('data', (chunk) => chunks.push(chunk));
         
-        audioStream.pipe(res);
+        audioStream.on('end', () => {
+            const audioBuffer = Buffer.concat(chunks);
+            res.setHeader('Content-Type', 'audio/mpeg');
+            res.setHeader('Content-Length', audioBuffer.length);
+            res.send(audioBuffer);
+        });
         
         audioStream.on('error', (err) => {
             console.error('Edge TTS Stream Error:', err);
-            // Can't send error response if headers sent, but end stream
-            res.end();
+            if (!res.headersSent) {
+                res.status(500).send('TTS Stream Error');
+            }
         });
 
     } catch (error) {
         console.error('Edge TTS Error:', error);
-        res.status(500).send('TTS Generation Failed');
+        if (!res.headersSent) {
+            res.status(500).send('TTS Generation Failed');
+        }
     }
 });
 

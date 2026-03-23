@@ -30,7 +30,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   useEffect(() => {
     if (audioRef.current) {
       if (isPlaying) {
-        audioRef.current.play().catch(e => console.error("Play failed:", e));
+        audioRef.current.play().catch(e => {
+          console.error("Play failed:", e);
+          // If playback fails (e.g. autoplay policy), revert to paused state
+          // so the user can click play again manually.
+          if (onPlayPause) onPlayPause();
+        });
       } else {
         audioRef.current.pause();
       }

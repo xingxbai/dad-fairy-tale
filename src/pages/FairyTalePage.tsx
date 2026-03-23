@@ -46,13 +46,6 @@ export function FairyTalePage() {
 
   const handleInteraction = (data: any, submit: (c: string) => void) => {
     setInteraction({ data, submit });
-    // Optional: Auto-play TTS for the question?
-    generateTTS(data.question, voiceId).then(url => {
-       if(url) {
-           const audio = new Audio(url);
-           audio.play();
-       }
-    });
   };
 
   const onOptionSelected = (option: any) => {

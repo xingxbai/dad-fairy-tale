@@ -20,7 +20,9 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return 'S_pkpEVvSN1';
   });
   const [voiceType, setVoiceTypeState] = useState<VoiceType>(() => {
-    return (localStorage.getItem('english_voice_type') as VoiceType) || 'dad';
+    return (
+      (localStorage.getItem('english_voice_type') as VoiceType) || 'standard'
+    );
   });
 
   useEffect(() => {
