@@ -87,14 +87,20 @@ app.get('/api/tts-stream/:streamId', async (req, res) => {
         const tts = new MsEdgeTTS();
         await tts.setMetadata(voiceId, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
         
-        // 关键修改：改回 Buffer 模式。
-        // 虽然初始点击到播放会有 3-5 秒延迟，但它能提供 Content-Length，
-        // 彻底解决移动端因 Range 请求不连贯导致的“7-8秒断连”和“无法拖动进度条”的问题。
-        const buffer = await tts.toBuffer(text, { 
+        console.log(`[TTS Stream] Generating full audio for stability...`);
+
+        // MsEdgeTTS does not have toBuffer, we must collect chunks from the stream
+        const { audioStream } = await tts.toStream(text, { 
             rate: "-15%",
         });
+
+        const chunks = [];
+        for await (const chunk of audioStream) {
+            chunks.push(chunk);
+        }
+        const buffer = Buffer.concat(chunks);
         
-        console.log(`[TTS Stream] Buffer ready: ${buffer.length} bytes. Sending to client...`);
+        console.log(`[TTS Stream] Audio ready: ${buffer.length} bytes. Sending to client...`);
 
         res.setHeader('Content-Type', 'audio/mpeg');
         res.setHeader('Content-Length', buffer.length);
