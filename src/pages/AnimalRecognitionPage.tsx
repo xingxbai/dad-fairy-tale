@@ -26,7 +26,7 @@ export function AnimalRecognitionPage() {
     setDirection(-1);
     setCurrentIndex((prev) => (prev - 1 + ANIMALS.length) % ANIMALS.length);
   };
-
+  console.log(isPlaying);
   const generateWithAI = async () => {
     setIsLoadingAI(true);
     try {
@@ -163,11 +163,21 @@ export function AnimalRecognitionPage() {
           </button>
           
           <button 
-            onClick={playSound}
-            className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center shadow-lg text-white active:scale-90 transition-transform relative group"
+            onClick={() => {
+              if (isPlaying) {
+                // If currently playing, treat as pause request
+                if (audioRef.current) {
+                  audioRef.current.pause();
+                  setIsPlaying(false);
+                }
+              } else {
+                playSound();
+              }
+            }}
+            className={`w-20 h-20 bg-green-500 rounded-full flex items-center justify-center shadow-lg text-white active:scale-90 transition-transform relative group ${isPlaying ? 'ring-4 ring-green-300 scale-110' : ''}`}
           >
-            <div className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-20 hidden group-active:block"></div>
-            <Volume2 className="w-10 h-10" />
+            <div className={`absolute inset-0 bg-green-500 rounded-full animate-ping opacity-20 ${isPlaying ? 'block' : 'hidden group-active:block'}`}></div>
+            <Volume2 className={`w-10 h-10 ${isPlaying ? 'animate-pulse' : ''}`} />
           </button>
 
           <button 
