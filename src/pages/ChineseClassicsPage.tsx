@@ -85,7 +85,7 @@ export function ChineseClassicsPage() {
       </header>
 
       <main className="container mx-auto px-4 pt-8 max-w-md">
-        {!dadVoiceId ? (
+        { false ? (
           <VoiceRecorder />
         ) : (
           <div className="space-y-8">

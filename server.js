@@ -46,6 +46,7 @@ function mapVoiceId(voiceId) {
 // Endpoint for initializing a TTS stream
 app.post('/api/tts-stream/init', express.json(), (req, res) => {
     const { text, voiceId } = req.body;
+    console.log(`[TTS Init] Session started. Voice: ${voiceId}, Text: ${text?.slice(0, 20)}...`);
     if (!text) {
         return res.status(400).json({ error: 'Missing text' });
     }
@@ -64,21 +65,25 @@ app.post('/api/tts-stream/init', express.json(), (req, res) => {
         }
     }
 
+    console.log(`[TTS Init] Stream prepared: ${streamId}`);
     res.json({ streamId });
 });
 
 // Endpoint for streaming TTS audio
 app.get('/api/tts-stream/:streamId', async (req, res) => {
     const { streamId } = req.params;
+    console.log(`[TTS Stream] Request received for ID: ${streamId}`);
     const requestData = streamRequests.get(streamId);
 
     if (!requestData) {
+        console.warn(`[TTS Stream] Stream ID ${streamId} not found or expired.`);
         return res.status(404).send('Stream not found or expired');
     }
 
     streamRequests.delete(streamId); // One-time use
 
     const { text, voiceId } = requestData;
+    console.log(`[TTS Stream] Generating audio with voice: ${voiceId}`);
 
     try {
         const tts = new MsEdgeTTS();
@@ -97,11 +102,11 @@ app.get('/api/tts-stream/:streamId', async (req, res) => {
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Transfer-Encoding', 'chunked');
         
-        // Pipe the stream directly
+        console.log(`[TTS Stream] Piping audio stream to client...`);
         audioStream.pipe(res);
         
         audioStream.on('error', (err) => {
-            console.error('TTS Stream Error:', err);
+            console.error('[TTS Stream] Edge TTS Stream Error:', err);
             if (!res.headersSent) {
                 res.status(500).send('Stream Error');
             } else {
@@ -110,7 +115,7 @@ app.get('/api/tts-stream/:streamId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Edge TTS Error:', error);
+        console.error('[TTS Stream] Edge TTS Error:', error);
         if (!res.headersSent) {
             res.status(500).send('TTS Generation Failed');
         }

@@ -17,7 +17,7 @@ export function FairyTalePage() {
   });
   const [isPlaying, setIsPlaying] = useState(false);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
-  const { dadVoiceId, voiceId } = useVoice();
+  const { voiceId } = useVoice();
 
   // Streaming state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -105,7 +105,7 @@ export function FairyTalePage() {
       </header>
 
       <main className="container mx-auto px-4 pt-8 max-w-md">
-        {!dadVoiceId ? (
+        { false ? (
           <VoiceRecorder />
         ) : (
           <div className="space-y-8">
