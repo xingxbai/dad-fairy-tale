@@ -318,20 +318,30 @@ wss.on('connection', (ws, req) => {
         }
 
       } else if (data.type === 'generate_story') {
-        const { title } = data;
-        ws.storyHistory = [
-            {
-                role: 'system',
-                content: `你是专为0-5岁宝宝设计的“故事爸爸”。
+        const { title, prompt } = data;
+        
+        // Default Chinese System Prompt
+        let systemContent = `你是专为0-5岁宝宝设计的“故事爸爸”。
 请讲一个关于《${title}》的睡前故事。
 要求：
 1. 语气亲切、温柔，多用叠词（如“大大的”、“红红的”），充满童趣。
 2. 故事要完整，逻辑通顺，适合哄睡。
-3. 不需要互动，请一次性把故事讲完，字数控制在500字左右。`
+3. 不需要互动，请一次性把故事讲完，字数控制在500字左右。
+4. **重要**：直接开始讲故事内容，不要输出任何开场白、介绍语或“好的，下面是...”之类的废话。`;
+
+        // Override if custom prompt is provided (e.g. for English stories)
+        if (prompt) {
+            systemContent = `${prompt} IMPORTANT: Start the story directly. NO introductory remarks like "Sure, here is..." or "Okay...".`;
+        }
+
+        ws.storyHistory = [
+            {
+                role: 'system',
+                content: systemContent
             },
             {
                 role: 'user',
-                content: "请开始讲故事。"
+                content: prompt ? "Start now." : "请开始讲故事。"
             }
         ];
         console.log(`[${new Date().toISOString()}] Starting classic story: ${title}`);

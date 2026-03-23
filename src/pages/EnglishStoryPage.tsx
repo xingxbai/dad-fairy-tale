@@ -110,7 +110,7 @@ export function EnglishStoryPage() {
                             onReasoningUpdate={handleReasoningUpdate}
                             voiceId={voiceId || undefined}
                             topics={ENGLISH_STORIES}
-                            promptTemplate={(title) => `Please tell me a simple story about "${title}" in English, suitable for prenatal education. Keep it short and sweet.`}
+                            promptTemplate={(title) => `Roleplay as a native English teacher. Tell a bedtime story about "${title}" for 0-5 year old kids. IMPORTANT: STRICTLY ONLY ENGLISH. NO CHINESE characters. Use simple vocabulary and warm tone.`}
                         />
                     </div>
                 </div>
@@ -123,7 +123,7 @@ export function EnglishStoryPage() {
                   onReasoningUpdate={handleReasoningUpdate}
                   voiceId={voiceId || undefined}
                   topics={ENGLISH_STORIES}
-                  promptTemplate={(title) => `Please tell me a simple story about "${title}" in English, suitable for prenatal education. Keep it short and sweet.`}
+                  promptTemplate={(title) => `Roleplay as a native English teacher. Tell a bedtime story about "${title}" for 3-5 year old kids. IMPORTANT: STRICTLY ONLY ENGLISH. NO CHINESE characters. Use simple vocabulary and warm tone.`}
                 />
               </div>
             ) : (
@@ -149,7 +149,7 @@ export function EnglishStoryPage() {
                     onReasoningUpdate={handleReasoningUpdate}
                     voiceId={userState.voiceId || undefined}
                     topics={ENGLISH_STORIES}
-                    promptTemplate={(title) => `Please tell me a simple story about "${title}" in English, suitable for prenatal education. Keep it short and sweet.`}
+                    promptTemplate={(title) => `Roleplay as a native English teacher. Tell a bedtime story about "${title}" for 3-5 year old kids. IMPORTANT: STRICTLY ONLY ENGLISH. NO CHINESE characters. Use simple vocabulary and warm tone.`}
                   />
                 </div>
               </>
