@@ -64,7 +64,8 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       let wsUrl = `${wsProtocol}//${window.location.host}`;
       if (import.meta.env.DEV) {
-          wsUrl = `ws://${window.location.hostname}:3000`;
+          // Point to your actual backend server instead of local machine's 3000
+          wsUrl = `ws://123.57.133.106:3000`;
       }
 
       const ws = new WebSocket(wsUrl);

@@ -30,12 +30,26 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   useEffect(() => {
     if (audioRef.current) {
       if (isPlaying) {
-        audioRef.current.play().catch(e => {
-          console.error("Play failed:", e);
-          // If playback fails (e.g. autoplay policy), revert to paused state
-          // so the user can click play again manually.
-          if (onPlayPause) onPlayPause();
-        });
+        // Force reload and play on user interaction
+        if (audioUrl) {
+          const absoluteUrl = audioUrl.startsWith('http') ? audioUrl : window.location.origin + audioUrl;
+          if (audioRef.current.src !== absoluteUrl) {
+             audioRef.current.src = absoluteUrl;
+             audioRef.current.load();
+          }
+        }
+        
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(e => {
+            console.error("Play failed:", e);
+            // On mobile, play often fails if not strictly inside a user click.
+            // We retry one more time because sometimes the first failed and state is still in-sync.
+            if (e.name === 'NotAllowedError' || e.name === 'NotSupportedError') {
+              console.log("Waiting for user tap to resume session");
+            }
+          });
+        }
       } else {
         audioRef.current.pause();
       }

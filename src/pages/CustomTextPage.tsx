@@ -15,23 +15,24 @@ export function CustomTextPage() {
 
   const handleGenerateAndPlay = async () => {
     if (!text.trim()) return;
+    console.log("CustomTextPage handleGenerateAndPlay", { text, voiceId });
     
-    // 如果已经有音频且文本没变，直接播放？这里简化逻辑，每次点击都重新生成，或者如果url存在且文本没变就不生成
-    // 为了简单，假设用户点击就是想重新生成或播放。
-    // 如果当前正在播放，先暂停
     setIsPlaying(false);
     
     setIsGenerating(true);
     try {
-      const url = await generateTTS(text, voiceId);
+      const url = await generateTTS(text, voiceId || 'zh-CN-XiaoxiaoNeural');
+      console.log("CustomTextPage TTS Result:", { url });
       if (url) {
         setAudioUrl(url);
         setIsPlaying(true);
       } else {
         console.error('生成语音失败: URL is null');
+        alert("语音生成失败");
       }
     } catch (error) {
       console.error('生成语音出错了:', error);
+      alert("生成请求异常");
     } finally {
       setIsGenerating(false);
     }

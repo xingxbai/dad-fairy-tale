@@ -44,6 +44,7 @@ export function BedtimeStoryPage() {
   };
 
   const handlePlayPause = async () => {
+    console.log("BedtimeStoryPage handlePlayPause", { isPlaying, audioUrl: userState.currentStory?.audioUrl, voiceId });
     if (isPlaying) {
       setIsPlaying(false);
       return;
@@ -54,9 +55,10 @@ export function BedtimeStoryPage() {
       return;
     }
 
-    if (userState.currentStory && voiceId) {
+    if (userState.currentStory && (voiceId || true)) {
       setIsGeneratingAudio(true);
-      const audioUrl = await generateTTS(userState.currentStory.content, voiceId);
+      console.log("Generating Bedtime TTS...");
+      const audioUrl = await generateTTS(userState.currentStory.content, voiceId || 'zh-CN-XiaoxiaoNeural');
       setIsGeneratingAudio(false);
 
       if (audioUrl) {

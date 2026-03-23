@@ -63,6 +63,7 @@ export function FairyTalePage() {
   };
 
   const handlePlayPause = async () => {
+    console.log("handlePlayPause called", { isPlaying, audioUrl: userState.currentStory?.audioUrl });
     if (isPlaying) {
       setIsPlaying(false);
       return;
@@ -73,10 +74,12 @@ export function FairyTalePage() {
       return;
     }
 
-    if (userState.currentStory && voiceId) {
+    if (userState.currentStory && (voiceId || true)) { // Fallback to true if voiceId is missing
+      console.log("Starting TTS generation...");
       setIsGeneratingAudio(true);
-      const audioUrl = await generateTTS(userState.currentStory.content, voiceId);
+      const audioUrl = await generateTTS(userState.currentStory.content, voiceId || 'zh-CN-XiaoxiaoNeural');
       setIsGeneratingAudio(false);
+      console.log("TTS generation finished", { audioUrl });
 
       if (audioUrl) {
         setUserState(prev => ({ ...prev, currentStory: { ...prev.currentStory!, audioUrl } }));
