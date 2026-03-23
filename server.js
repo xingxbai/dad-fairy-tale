@@ -91,18 +91,22 @@ app.get('/api/tts-stream/:streamId', async (req, res) => {
             rate: "-15%",   // Slower speed for kids
         });
         
-        // Use chunked transfer encoding to stream audio as it's generated
-        res.setHeader('Content-Type', 'audio/mpeg');
-        res.setHeader('Transfer-Encoding', 'chunked');
+        const chunks = [];
+        audioStream.on('data', (chunk) => chunks.push(chunk));
         
-        audioStream.pipe(res);
+        audioStream.on('end', () => {
+            const audioBuffer = Buffer.concat(chunks);
+            res.setHeader('Content-Type', 'audio/mpeg');
+            res.setHeader('Content-Length', audioBuffer.length);
+            // Help mobile browsers cache and seek
+            res.setHeader('Accept-Ranges', 'bytes');
+            res.send(audioBuffer);
+        });
         
         audioStream.on('error', (err) => {
             console.error('Edge TTS Stream Error:', err);
             if (!res.headersSent) {
                 res.status(500).send('TTS Stream Error');
-            } else {
-                res.end();
             }
         });
 
