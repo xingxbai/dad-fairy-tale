@@ -9,7 +9,6 @@ import type { Story, UserState } from '../types';
 import { BookOpen, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useVoice } from '../contexts/VoiceContext';
-import { VoiceSelector } from '../components/VoiceSelector';
 
 export function FairyTalePage() {
   const [userState, setUserState] = useState<UserState>({

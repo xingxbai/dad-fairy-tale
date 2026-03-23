@@ -9,7 +9,6 @@ import { BookOpen, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BEDTIME_STORIES } from '../data/topics';
 import { useVoice } from '../contexts/VoiceContext';
-import { VoiceSelector } from '../components/VoiceSelector';
 
 export function BedtimeStoryPage() {
   const [userState, setUserState] = useState<UserState>({

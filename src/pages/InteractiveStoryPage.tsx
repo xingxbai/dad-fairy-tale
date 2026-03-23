@@ -5,7 +5,6 @@ import { InteractiveOptions } from '../components/InteractiveOptions';
 import type { Story, UserState } from '../types';
 import { ArrowLeft, Gamepad2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { VoiceSelector } from '../components/VoiceSelector';
 
 export function InteractiveStoryPage() {
   const [userState, setUserState] = useState<UserState>({

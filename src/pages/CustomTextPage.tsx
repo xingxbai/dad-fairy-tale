@@ -4,7 +4,6 @@ import { generateTTS } from '../services/ttsService';
 import { ArrowLeft, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useVoice } from '../contexts/VoiceContext';
-import { VoiceSelector } from '../components/VoiceSelector';
 import { VoiceInput } from '../components/VoiceInput';
 
 export function CustomTextPage() {

@@ -9,7 +9,6 @@ import { BookOpen, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CHINESE_CLASSICS } from '../data/topics';
 import { useVoice } from '../contexts/VoiceContext';
-import { VoiceSelector } from '../components/VoiceSelector';
 
 export function ChineseClassicsPage() {
   const [userState, setUserState] = useState<UserState>({
