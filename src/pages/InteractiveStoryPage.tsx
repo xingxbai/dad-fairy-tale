@@ -74,7 +74,6 @@ export function InteractiveStoryPage() {
             <Gamepad2 className="w-6 h-6 text-primary-600 mr-2" />
             <h1 className="text-lg font-bold text-primary-900">互动故事</h1>
           </div>
-          <VoiceSelector />
         </div>
       </header>
 

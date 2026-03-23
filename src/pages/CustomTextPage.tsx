@@ -52,7 +52,6 @@ export function CustomTextPage() {
             </Link>
             <h1 className="text-lg font-bold text-primary-900">自定义播放</h1>
           </div>
-          <VoiceSelector color="purple" />
         </div>
       </header>
 

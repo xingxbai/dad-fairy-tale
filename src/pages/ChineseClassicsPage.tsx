@@ -80,7 +80,6 @@ export function ChineseClassicsPage() {
             <BookOpen className="w-6 h-6 text-amber-600 mr-2" />
             <h1 className="text-lg font-bold text-amber-900">国学经典</h1>
           </div>
-          <VoiceSelector color="amber" />
         </div>
       </header>
 

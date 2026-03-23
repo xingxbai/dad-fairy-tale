@@ -19,11 +19,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [dadVoiceId, setDadVoiceIdState] = useState<string | null>(() => {
     return 'S_pkpEVvSN1';
   });
-  const [voiceType, setVoiceTypeState] = useState<VoiceType>(() => {
-    return (
-      (localStorage.getItem('english_voice_type') as VoiceType) || 'standard'
-    );
-  });
+  const [voiceType, setVoiceTypeState] = useState<VoiceType>('standard');
 
   useEffect(() => {
     if (dadVoiceId) {
@@ -32,7 +28,10 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [dadVoiceId]);
 
   useEffect(() => {
-    localStorage.setItem('english_voice_type', voiceType);
+    // Keep standard forced
+    if (voiceType !== 'standard') {
+      setVoiceTypeState('standard');
+    }
   }, [voiceType]);
 
   const setDadVoiceId = (id: string) => {

@@ -80,7 +80,6 @@ export function BedtimeStoryPage() {
             <BookOpen className="w-6 h-6 text-indigo-600 mr-2" />
             <h1 className="text-lg font-bold text-indigo-900">晚安故事</h1>
           </div>
-          <VoiceSelector color="indigo" />
         </div>
       </header>
 

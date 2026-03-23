@@ -86,22 +86,23 @@ app.get('/api/tts-stream/:streamId', async (req, res) => {
         // Use high quality output format
         await tts.setMetadata(voiceId, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
         
-        const { audioStream } = await tts.toStream(text);
-        
-        const chunks = [];
-        audioStream.on('data', (chunk) => chunks.push(chunk));
-        
-        audioStream.on('end', () => {
-            const audioBuffer = Buffer.concat(chunks);
-            res.setHeader('Content-Type', 'audio/mpeg');
-            res.setHeader('Content-Length', audioBuffer.length);
-            res.send(audioBuffer);
+        // request options: rate (negative for slower), volume (0-100 or relative), pitch
+        const { audioStream } = await tts.toStream(text, { 
+            rate: "-15%",   // Slower speed for kids
         });
+        
+        // Use chunked transfer encoding to stream audio as it's generated
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Transfer-Encoding', 'chunked');
+        
+        audioStream.pipe(res);
         
         audioStream.on('error', (err) => {
             console.error('Edge TTS Stream Error:', err);
             if (!res.headersSent) {
                 res.status(500).send('TTS Stream Error');
+            } else {
+                res.end();
             }
         });
 
@@ -290,7 +291,9 @@ wss.on('connection', (ws, req) => {
         try {
             const tts = new MsEdgeTTS();
             await tts.setMetadata(edgeVoiceId, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-            const { audioStream } = await tts.toStream(text);
+            const { audioStream } = await tts.toStream(text, { 
+                rate: "-15%",   // Slower speed for kids
+            });
             
             audioStream.on('data', (chunk) => {
                  ws.send(JSON.stringify({ 

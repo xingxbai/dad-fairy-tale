@@ -80,10 +80,6 @@ export function EnglishStoryPage() {
             <BookOpen className="w-6 h-6 text-blue-600 mr-2" />
             <h1 className="text-lg font-bold text-blue-900">英文启蒙</h1>
           </div>
-          
-          <div className="flex items-center">
-            <VoiceSelector color="blue" />
-          </div>
         </div>
       </header>
 

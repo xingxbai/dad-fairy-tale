@@ -99,7 +99,6 @@ export function FairyTalePage() {
             <BookOpen className="w-6 h-6 text-primary-600 mr-2" />
             <h1 className="text-lg font-bold text-primary-900">安徒生童话</h1>
           </div>
-          <VoiceSelector color="purple" />
         </div>
       </header>
 
