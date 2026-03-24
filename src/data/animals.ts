@@ -13,8 +13,24 @@ export const ANIMALS: Animal[] = [
     name: '狮子',
     englishName: 'Lion',
     image: 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=800&q=80',
-    sound: '/api/animal/static/lion',
+    sound: '/sounds/lion.mp3',
     description: '森林之王，吼声很大。'
+  },
+  {
+    id: 'tiger',
+    name: '老虎',
+    englishName: 'Tiger',
+    image: 'https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?w=800&q=80',
+    sound: '/sounds/tiger.mp3',
+    description: '威风凛凛的山中大王。'
+  },
+  {
+    id: 'deer',
+    name: '鹿',
+    englishName: 'Deer',
+    image: 'https://images.unsplash.com/photo-1543946207-39bd91e70ca7?w=800&q=80',
+    sound: '/sounds/deer.mp3',
+    description: '温顺的梅花鹿，跑得很快。'
   },
   {
     id: 'elephant',

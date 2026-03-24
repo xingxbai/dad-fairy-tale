@@ -87,10 +87,11 @@ app.get('/api/animal/static/:animalId', async (req, res) => {
     }
 
     try {
-        const tts = new MsEdgeTTS();
-        // Simple mapping for default animals
+        // Optimized mapping for animal sounds using stable Edge TTS descriptions
         const animalMap = {
             'lion': '我是狮子，大草原上的王者。吼！',
+            'tiger': '我是大老虎，我有橘色的条纹，吼！',
+            'deer': '我是梅花鹿，我跑得非常快，呦呦！',
             'elephant': '我是大象，我的鼻子很长很长。',
             'cat': '我是小猫，喵喵喵，我最喜欢吃鱼了。',
             'dog': '我是小狗，汪汪汪，我是人类的好朋友。',

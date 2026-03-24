@@ -56,14 +56,13 @@ export function AnimalRecognitionPage() {
   const playSound = () => {
     if (audioRef.current) {
       if (audioRef.current.paused) {
-        audioRef.current.load(); // Reload the asset before playing
+        // Force reset and load to ensure we get the latest file content
+        audioRef.current.currentTime = 0;
         audioRef.current.play()
           .then(() => setIsPlaying(true))
           .catch(e => {
             console.error("Audio play failed detailed:", e);
-            if (e.name === 'NotSupportedError') {
-              alert("音频加载失败，请再次点击刷新 AI 资源后再试");
-            }
+            alert("音频加载失败，请确保 public/sounds/ 目录下存在对应的 mp3 文件");
           });
       } else {
         audioRef.current.pause();
