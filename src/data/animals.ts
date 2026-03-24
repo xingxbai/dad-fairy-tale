@@ -7,9 +7,6 @@ export interface Animal {
   description: string;
 }
 
-const createAnimalPlaceholder = (name: string, englishName: string) =>
-  `https://placehold.co/800x600/e8f5e9/166534?text=${encodeURIComponent(`${name} ${englishName}`)}`;
-
 export const ANIMALS: Animal[] = [
   {
     id: 'lion',
@@ -48,6 +45,7 @@ export const ANIMALS: Animal[] = [
     name: '小猫',
     englishName: 'Cat',
     image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=800&q=80',
+    sound: '/sounds/cat.mp3',
     description: '爱吃鱼，喜欢喵喵叫。'
   },
   {
@@ -70,49 +68,52 @@ export const ANIMALS: Animal[] = [
     id: 'pig',
     name: '猪',
     englishName: 'Pig',
-    image: createAnimalPlaceholder('猪', 'Pig'),
+    image: 'https://images.unsplash.com/photo-1604848698030-c434ba08ece1?w=800&q=80',
+    sound: '/sounds/pig.mp3',
     description: '喜欢在泥巴里打滚，哼哼叫。'
   },
   {
     id: 'rabbit',
     name: '兔子',
     englishName: 'Rabbit',
-    image: createAnimalPlaceholder('兔子', 'Rabbit'),
+    image: 'https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?w=800&q=80',
+    sound: '/sounds/rabbit.mp3',
     description: '长着长耳朵，蹦蹦跳跳很可爱。'
   },
   {
     id: 'monkey',
     name: '猴子',
     englishName: 'Monkey',
-    image: createAnimalPlaceholder('猴子', 'Monkey'),
+    image: 'https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?w=800&q=80',
     description: '喜欢爬树，动作灵活又调皮。'
   },
   {
     id: 'panda',
     name: '熊猫',
     englishName: 'Panda',
-    image: createAnimalPlaceholder('熊猫', 'Panda'),
+    image: 'https://images.unsplash.com/photo-1564349683136-77e08dba1ef7?w=800&q=80',
+    sound: '/sounds/panda.mp3',
     description: '黑白相间，最爱抱着竹子慢慢吃。'
   },
   {
     id: 'sheep',
     name: '绵羊',
     englishName: 'Sheep',
-    image: createAnimalPlaceholder('绵羊', 'Sheep'),
+    image: 'https://images.unsplash.com/photo-1484557985045-edf25e08da73?w=800&q=80',
     description: '毛茸茸的，喜欢在草地上安静吃草。'
   },
   {
     id: 'cow',
     name: '奶牛',
     englishName: 'Cow',
-    image: createAnimalPlaceholder('奶牛', 'Cow'),
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Cow_female_black_white.jpg/800px-Cow_female_black_white.jpg',
     description: '黑白花纹很显眼，喜欢慢悠悠地嚼草。'
   },
   {
     id: 'horse',
     name: '小马',
     englishName: 'Horse',
-    image: createAnimalPlaceholder('小马', 'Horse'),
+    image: 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800&q=80',
     description: '跑得又快又稳，鬃毛飘起来很好看。'
   },
   {
