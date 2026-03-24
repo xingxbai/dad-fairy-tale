@@ -190,27 +190,88 @@ app.post('/api/animal/generate', express.json(), async (req, res) => {
     const API_KEY = 'sk-dzmbqursqauctwedlliqflvcjndhsaebsyculmcnfetshpbt';
     const BASE_URL = 'https://api.siliconflow.cn/v1';
 
+    // 定义多个备选模型（按优先级排序）
+    const IMAGE_MODELS = [
+        {
+            name: "stabilityai/stable-diffusion-xl-base-1.0",
+            size: "1024x1024",
+            prompt: `professional wildlife photography of a ${englishName}, detailed fur texture, natural lighting, photorealistic, sharp focus, beautiful bokeh, national geographic style, 4k quality, canon EOS camera`
+        },
+        {
+            name: "stabilityai/stable-diffusion-2-1",
+            size: "768x768",
+            prompt: `${englishName} animal portrait, realistic photography, natural habitat, professional lighting, high detail, photorealistic, sharp focus, nature documentary style`
+        },
+        {
+            name: "Kwai-Kolors/Kolors",
+            size: "1024x1024", 
+            prompt: `${name}的专业摄影照片，真实自然，细节清晰，纪录片风格，自然光照，高清画质，逼真写实`
+        }
+    ];
+
+    let imageUrl = null;
+
+    // 1. 尝试生成图片（多个模型fallback）
+    for (const modelConfig of IMAGE_MODELS) {
+        try {
+            console.log(`[Animal AI] Trying model: ${modelConfig.name}...`);
+            const imageResponse = await fetch(`${BASE_URL}/images/generations`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${API_KEY}`,
+                },
+                body: JSON.stringify({
+                    model: modelConfig.name,
+                    prompt: modelConfig.prompt,
+                    image_size: modelConfig.size,
+                    num_inference_steps: 20
+                }),
+            });
+
+            const imageData = await imageResponse.json();
+            
+            if (imageData.data?.[0]?.url) {
+                imageUrl = imageData.data[0].url;
+                console.log(`[Animal AI] ✓ Image generated successfully with ${modelConfig.name}`);
+                break; // 成功则跳出循环
+            } else if (imageData.code) {
+                console.log(`[Animal AI] ✗ Model ${modelConfig.name} failed: ${imageData.code} - ${imageData.message}`);
+            }
+        } catch (error) {
+            console.error(`[Animal AI] ✗ Model ${modelConfig.name} error:`, error.message);
+        }
+    }
+
+    // 如果所有模型都失败，使用Unsplash备选图片池
+    if (!imageUrl) {
+        console.log(`[Animal AI] All AI models failed, using Unsplash fallback...`);
+        const unsplashPools = {
+            'Lion': ['https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=1024&q=80', 'https://images.unsplash.com/photo-1614027164847-1b28cfe1df60?w=1024&q=80'],
+            'Tiger': ['https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=1024&q=80', 'https://images.unsplash.com/photo-1508817628294-5a453fa0b8fb?w=1024&q=80'],
+            'Deer': ['https://images.unsplash.com/photo-1551892374-ecf8754cf8b0?w=1024&q=80', 'https://images.unsplash.com/photo-1484406566174-9da000fda645?w=1024&q=80'],
+            'Elephant': ['https://images.unsplash.com/photo-1564760055775-d63b17a55c44?w=1024&q=80', 'https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=1024&q=80'],
+            'Cat': ['https://images.unsplash.com/photo-1574158622682-e40e69881006?w=1024&q=80', 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=1024&q=80'],
+            'Dog': ['https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=1024&q=80', 'https://images.unsplash.com/photo-1477884213360-7e9d7dcc1e48?w=1024&q=80'],
+            'Duck': ['https://images.unsplash.com/photo-1551155438-b3d2d6f44f1e?w=1024&q=80', 'https://images.unsplash.com/photo-1598846019232-a3042340d2f3?w=1024&q=80'],
+            'Rooster': ['https://images.unsplash.com/photo-1612170153139-6f881ff067e0?w=1024&q=80', 'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?w=1024&q=80'],
+            'Rabbit': ['https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?w=1024&q=80', 'https://images.unsplash.com/photo-1535241749838-299277b6305f?w=1024&q=80'],
+            'Monkey': ['https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?w=1024&q=80', 'https://images.unsplash.com/photo-1617775177796-86d1cfde48ff?w=1024&q=80'],
+            'Panda': ['https://images.unsplash.com/photo-1564349683136-77e08dba1ef7?w=1024&q=80', 'https://images.unsplash.com/photo-1525382455947-f319bc05fb35?w=1024&q=80'],
+            'Sheep': ['https://images.unsplash.com/photo-1550979336-eefb43c93c02?w=1024&q=80', 'https://images.unsplash.com/photo-1542223189-67a03fa0f0bd?w=1024&q=80'],
+            'Cow': ['https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=1024&q=80', 'https://images.unsplash.com/photo-1561337623-665cbac8f3e8?w=1024&q=80'],
+            'Horse': ['https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=1024&q=80', 'https://images.unsplash.com/photo-1560493676-04071c5f467b?w=1024&q=80']
+        };
+        
+        const pool = unsplashPools[englishName];
+        if (pool) {
+            imageUrl = pool[Math.floor(Math.random() * pool.length)] + `&t=${Date.now()}`;
+        }
+    }
+
     try {
-        // 1. Generate Image using FLUX
-        const imageResponse = await fetch(`${BASE_URL}/images/generations`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${API_KEY}`,
-            },
-            body: JSON.stringify({
-                model: "black-forest-labs/FLUX.1-schnell",
-                prompt: `(masterpiece), (best quality), highly detailed animal portrait of a ${englishName}, children's book illustration style, bright colors, cute, 3d render feel, soft lighting, white background.`,
-                image_size: "1024x1024"
-            }),
-        });
-
-        const imageData = await imageResponse.json();
-        const imageUrl = imageData.data?.[0]?.url;
-
-        // 2. Generate Sound/Voice using Edge TTS (Simulating the sound or reading a description)
+        // 2. 生成音频 (使用 Edge TTS)
         const tts = new MsEdgeTTS();
-        // Prompt includes the animal's name and its characteristics to make it more interesting
         const soundDescription = `这是${name}。${name}的英语是 ${englishName}。听，这是它的声音！`; 
         await tts.setMetadata('zh-CN-YunxiNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
         const { audioStream } = await tts.toStream(soundDescription);
@@ -220,7 +281,6 @@ app.post('/api/animal/generate', express.json(), async (req, res) => {
         const buffer = Buffer.concat(chunks);
         
         const streamId = uuidv4();
-        // Correctly store as data with a 'buffer' property to match the loader logic
         streamRequests.set(streamId, { 
             buffer, 
             contentType: 'audio/mpeg',

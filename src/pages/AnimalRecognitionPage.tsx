@@ -40,11 +40,22 @@ export function AnimalRecognitionPage() {
         }),
       });
       const data = await response.json();
-      if (data.image && data.sound) {
+      // 支持部分成功：图片或音频任一生成成功即可更新
+      if (data.image || data.sound) {
         setAiResources(prev => ({
           ...prev,
-          [currentAnimal.id]: { image: data.image, sound: data.sound }
+          [currentAnimal.id]: { 
+            image: data.image || prev[currentAnimal.id]?.image || currentAnimal.image,
+            sound: data.sound || prev[currentAnimal.id]?.sound || currentAnimal.sound
+          }
         }));
+        
+        // 如果图片生成失败，给用户提示
+        if (!data.image && data.sound) {
+          alert("图片生成服务暂时不可用，已为您生成音频。您可以稍后重试图片生成。");
+        }
+      } else {
+        alert("AI 生成服务暂时不可用，请稍后再试");
       }
     } catch (error) {
       console.error("AI Generation Error:", error);
