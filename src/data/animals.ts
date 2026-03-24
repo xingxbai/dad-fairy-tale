@@ -20,7 +20,7 @@ export const ANIMALS: Animal[] = [
     id: 'tiger',
     name: '老虎',
     englishName: 'Tiger',
-    image: 'https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1501705388883-4ed8a543392c?w=800&q=80',
     sound: '/sounds/tiger.mp3',
     description: '威风凛凛的山中大王。'
   },
@@ -37,7 +37,7 @@ export const ANIMALS: Animal[] = [
     name: '大象',
     englishName: 'Elephant',
     image: 'https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?w=800&q=80',
-    sound: '/api/animal/static/elephant',
+    sound: '/sounds/elephant',
     description: '有着长长的鼻子和大大的耳朵。'
   },
   {
@@ -45,7 +45,7 @@ export const ANIMALS: Animal[] = [
     name: '小猫',
     englishName: 'Cat',
     image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=800&q=80',
-    sound: '/api/animal/static/cat',
+    sound: '/sounds/cat',
     description: '爱吃鱼，喜欢喵喵叫。'
   },
   {
@@ -53,23 +53,31 @@ export const ANIMALS: Animal[] = [
     name: '小狗',
     englishName: 'Dog',
     image: 'https://images.unsplash.com/photo-1517849845537-4d257902454a?w=800&q=80',
-    sound: '/api/animal/static/dog',
+    sound: '/sounds/dog',
     description: '人类的好朋友，喜欢汪汪叫。'
   },
   {
     id: 'duck',
     name: '鸭子',
     englishName: 'Duck',
-    image: 'https://images.unsplash.com/photo-1530121848912-820abeed7632?w=800&q=80',
-    sound: '/api/animal/static/duck',
+    image: 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=800&q=80',
+    sound: '/sounds/duck',
     description: '喜欢在水里游泳，嘎嘎叫。'
+  },
+  {
+    id: 'pig',
+    name: '猪',
+    englishName: 'Pig',
+    image: 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=800&q=80',
+    sound: '/sounds/pig',
+    description: '喜欢在泥巴里打滚，哼哼叫。'
   },
   {
     id: 'rooster',
     name: '公鸡',
     englishName: 'Rooster',
     image: 'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?w=800&q=80',
-    sound: '/api/animal/static/rooster',
+    sound: '/sounds/rooster',
     description: '早上喔喔叫，叫宝宝起床。'
   }
 ];
