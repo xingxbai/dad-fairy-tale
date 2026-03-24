@@ -16,6 +16,7 @@ export function AnimalRecognitionPage() {
   // Determine final image and sound: Prefer AI, then fallback to mock data
   const finalImage = aiResources[currentAnimal.id]?.image || currentAnimal.image;
   const finalSound = aiResources[currentAnimal.id]?.sound || currentAnimal.sound;
+  const hasSound = Boolean(finalSound);
 
   const handleNext = () => {
     setDirection(1);
@@ -54,6 +55,10 @@ export function AnimalRecognitionPage() {
   };
 
   const playSound = () => {
+    if (!finalSound) {
+      return;
+    }
+
     if (audioRef.current) {
       if (audioRef.current.paused) {
         // Force reset and load to ensure we get the latest file content
@@ -147,6 +152,11 @@ export function AnimalRecognitionPage() {
                 <p className="text-gray-600 text-center px-4 font-medium italic">
                   "{currentAnimal.description}"
                 </p>
+                {!hasSound && (
+                  <p className="text-sm font-medium text-amber-600 text-center">
+                    暂未提供本地叫声，可点击右上角让 AI 生成图片和声音
+                  </p>
+                )}
               </div>
             </motion.div>
           </AnimatePresence>
@@ -163,6 +173,10 @@ export function AnimalRecognitionPage() {
           
           <button 
             onClick={() => {
+              if (!hasSound) {
+                return;
+              }
+
               if (isPlaying) {
                 // If currently playing, treat as pause request
                 if (audioRef.current) {
@@ -173,9 +187,10 @@ export function AnimalRecognitionPage() {
                 playSound();
               }
             }}
-            className={`w-20 h-20 bg-green-500 rounded-full flex items-center justify-center shadow-lg text-white active:scale-90 transition-transform relative group ${isPlaying ? 'ring-4 ring-green-300 scale-110' : ''}`}
+            disabled={!hasSound}
+            className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg text-white transition-transform relative group ${hasSound ? 'bg-green-500 active:scale-90' : 'bg-gray-300 cursor-not-allowed'} ${isPlaying ? 'ring-4 ring-green-300 scale-110' : ''}`}
           >
-            <div className={`absolute inset-0 bg-green-500 rounded-full animate-ping opacity-20 ${isPlaying ? 'block' : 'hidden group-active:block'}`}></div>
+            <div className={`absolute inset-0 rounded-full animate-ping opacity-20 ${hasSound ? 'bg-green-500' : 'bg-gray-300'} ${isPlaying ? 'block' : 'hidden group-active:block'}`}></div>
             <Volume2 className={`w-10 h-10 ${isPlaying ? 'animate-pulse' : ''}`} />
           </button>
 
@@ -188,12 +203,15 @@ export function AnimalRecognitionPage() {
         </div>
 
         {/* Hidden Audio Element */}
-        <audio 
-          ref={audioRef}
-          src={finalSound}
-          key={finalSound}
-          onEnded={() => setIsPlaying(false)}
-        />
+        {finalSound && (
+          <audio 
+            ref={audioRef}
+            src={finalSound}
+            key={finalSound}
+            onEnded={() => setIsPlaying(false)}
+            onError={() => setIsPlaying(false)}
+          />
+        )}
 
         <div className="mt-8 text-green-800/40 text-sm font-medium text-center">
           点击右上角刷新图标，由 AI 实时生成
