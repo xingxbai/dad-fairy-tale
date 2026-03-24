@@ -60,7 +60,7 @@ export const ANIMALS: Animal[] = [
     id: 'duck',
     name: '鸭子',
     englishName: 'Duck',
-    image: 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=800&q=80',
+    image: 'https://images.unsplash.com/photo-15168483-a7212febe31a?w=800&q=80',
     sound: '/sounds/duck.mp3',
     description: '喜欢在水里游泳，嘎嘎叫。'
   },
@@ -68,7 +68,7 @@ export const ANIMALS: Animal[] = [
     id: 'pig',
     name: '猪',
     englishName: 'Pig',
-    image: 'https://images.unsplash.com/photo-1604848698030-c434ba08ece1?w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=800&q=80',
     sound: '/sounds/pig.mp3',
     description: '喜欢在泥巴里打滚，哼哼叫。'
   },
